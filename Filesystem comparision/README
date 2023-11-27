@@ -1,0 +1,33 @@
+Given scripts require zfsutils-linux for running. The installation instructions are:-
+
+1. APT update and upgrade
+      sudo apt update && upgrade
+            
+2. Install JRE
+      sudo apt-get install openjdk-8-jre
+      
+3. If Ubuntu version is below 20.04 use the following command to add latest zfs repo:- 
+      sudo add-apt-repository ppa:jonathonf/zfs
+      
+4. Run the command to install zfsutils-linux :- 
+      sudo apt-get install zfsutils-linux
+
+
+For running all the tests, we are creating virtual disks and installing zfs on it. 
+This is to ensure that real machine remains intact during the entire process.
+
+STEPS TO RUN (Provide root user password whenever prompted):
+
+1. Copy all the .sh and .conf files from "New_Files" folder to the vdbench directory
+
+2. To install ZFS(with appropriate parameters) on virtual disk and test Compression Feature, Run the command:- 
+      bash compressionTestScript.sh
+   The output can be found in folder "compressionTestOutput"
+   
+3. To install ZFS(with appropriate parameters) on virtual disk and test Encryption Feature, Run the command:- 
+      bash encryptionTestScript.sh
+   The output can be found in folder "encryptionTestOutput"
+   
+4. For removing all virtual disks and image files which were created during the test, Run the command:- 
+      bash cleanScript.sh
+   (In case some files don't exist and a warning may be printed, you may ignore it)

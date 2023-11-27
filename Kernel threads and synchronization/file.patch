@@ -1,0 +1,2265 @@
+diff -ruN my_xv6-public/defs.h xv6-public/defs.h
+--- my_xv6-public/defs.h	2022-09-05 12:13:25.301687663 +0530
++++ xv6-public/defs.h	2022-09-05 23:18:01.607439625 +0530
+@@ -120,9 +120,6 @@
+ int             wait(void);
+ void            wakeup(void*);
+ void            yield(void);
+-int             thread_create(void(*)(void *), void *, void *);
+-int             thread_join(void);
+-int             thread_exit(void);
+ 
+ // swtch.S
+ void            swtch(struct context**, struct context*);
+Binary files my_xv6-public/.git/index and xv6-public/.git/index differ
+diff -ruN my_xv6-public/.git/logs/HEAD xv6-public/.git/logs/HEAD
+--- my_xv6-public/.git/logs/HEAD	2022-08-12 22:50:53.888955608 +0530
++++ xv6-public/.git/logs/HEAD	2022-09-05 23:18:01.599439126 +0530
+@@ -1 +1 @@
+-0000000000000000000000000000000000000000 eeb7b415dbcb12cc362d0783e41c3d1f44066b17 Vedant Shah <vedant@vedant-VirtualBox.(none)> 1660324853 +0530	clone: from https://github.com/mit-pdos/xv6-public.git
++0000000000000000000000000000000000000000 eeb7b415dbcb12cc362d0783e41c3d1f44066b17 Vedant Shah <vedant@vedant-VirtualBox.(none)> 1662400081 +0530	clone: from https://github.com/mit-pdos/xv6-public.git
+diff -ruN my_xv6-public/.git/logs/refs/heads/master xv6-public/.git/logs/refs/heads/master
+--- my_xv6-public/.git/logs/refs/heads/master	2022-08-12 22:50:53.888955608 +0530
++++ xv6-public/.git/logs/refs/heads/master	2022-09-05 23:18:01.599439126 +0530
+@@ -1 +1 @@
+-0000000000000000000000000000000000000000 eeb7b415dbcb12cc362d0783e41c3d1f44066b17 Vedant Shah <vedant@vedant-VirtualBox.(none)> 1660324853 +0530	clone: from https://github.com/mit-pdos/xv6-public.git
++0000000000000000000000000000000000000000 eeb7b415dbcb12cc362d0783e41c3d1f44066b17 Vedant Shah <vedant@vedant-VirtualBox.(none)> 1662400081 +0530	clone: from https://github.com/mit-pdos/xv6-public.git
+diff -ruN my_xv6-public/.git/logs/refs/remotes/origin/HEAD xv6-public/.git/logs/refs/remotes/origin/HEAD
+--- my_xv6-public/.git/logs/refs/remotes/origin/HEAD	2022-08-12 22:50:53.888955608 +0530
++++ xv6-public/.git/logs/refs/remotes/origin/HEAD	2022-09-05 23:18:01.595438877 +0530
+@@ -1 +1 @@
+-0000000000000000000000000000000000000000 eeb7b415dbcb12cc362d0783e41c3d1f44066b17 Vedant Shah <vedant@vedant-VirtualBox.(none)> 1660324853 +0530	clone: from https://github.com/mit-pdos/xv6-public.git
++0000000000000000000000000000000000000000 eeb7b415dbcb12cc362d0783e41c3d1f44066b17 Vedant Shah <vedant@vedant-VirtualBox.(none)> 1662400081 +0530	clone: from https://github.com/mit-pdos/xv6-public.git
+diff -ruN my_xv6-public/Makefile xv6-public/Makefile
+--- my_xv6-public/Makefile	2022-09-05 11:59:37.516079155 +0530
++++ xv6-public/Makefile	2022-09-05 23:18:01.607439625 +0530
+@@ -181,7 +181,6 @@
+ 	_usertests\
+ 	_wc\
+ 	_zombie\
+-	_thread\
+ 
+ fs.img: mkfs README $(UPROGS)
+ 	./mkfs fs.img README $(UPROGS)
+@@ -252,7 +251,6 @@
+ 	mkfs.c ulib.c user.h cat.c echo.c forktest.c grep.c kill.c\
+ 	ln.c ls.c mkdir.c rm.c stressfs.c usertests.c wc.c zombie.c\
+ 	printf.c umalloc.c\
+-	thread.c\
+ 	README dot-bochsrc *.pl toc.* runoff runoff1 runoff.list\
+ 	.gdbinit.tmpl gdbutil\
+ 
+diff -ruN my_xv6-public/proc.c xv6-public/proc.c
+--- my_xv6-public/proc.c	2022-09-05 10:49:40.584155293 +0530
++++ xv6-public/proc.c	2022-09-05 23:18:01.615440124 +0530
+@@ -532,134 +532,3 @@
+     cprintf("\n");
+   }
+ }
+-
+-int
+-thread_create(void(*fcn)(void*), void *arg, void *stack)
+-{
+-  int i, pid;
+-  struct proc *np;
+-  struct proc *curproc = myproc();
+-
+-  // Allocate process.
+-  if((np = allocproc()) == 0){
+-    return -1;
+-  }
+-
+-  np->sz = curproc->sz;
+-  np->parent = curproc;
+-
+-  np->pgdir = curproc->pgdir;
+-  *np->tf = *curproc->tf;
+-  np->is_thread = 1;
+-  np->tf->eax = 0;
+-  np->tf->eip = (uint)fcn;
+-  //np->stack = (uint)stack; 
+-  np->tf->esp = (uint)stack + 4092;
+-  *((uint *)(np->tf->esp)) = (uint)arg;
+-  *((uint *)(np->tf->esp - 4)) = 0xFFFFFFFF;
+-  np->tf->esp -= 4;
+-  
+-  for(i = 0; i < NOFILE; i++)
+-    if(curproc->ofile[i])
+-      np->ofile[i] = filedup(curproc->ofile[i]);
+-  np->cwd = idup(curproc->cwd);
+-
+-  safestrcpy(np->name, curproc->name, sizeof(curproc->name));
+-
+-  pid = np->pid;
+-
+-  acquire(&ptable.lock);
+-
+-  np->state = RUNNABLE;
+-
+-  release(&ptable.lock);
+-
+-  return pid;
+-}
+-
+-int
+-thread_join(void)
+-{
+-  struct proc *p;
+-  int havekids, pid;
+-  struct proc *curproc = myproc();
+- 
+-  acquire(&ptable.lock);
+-  for (;;) {
+-    // Scan through table looking for exited children.
+-    havekids = 0;
+-    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+-      if (p->parent != curproc || p->is_thread != 1)
+-        continue;
+-      havekids = 1;
+-      if (p->state == ZOMBIE) {
+-        // Found one.
+-        pid = p->pid;
+-        kfree(p->kstack);
+-        p->kstack = 0;
+-        p->state = UNUSED;
+-        // we are not deallocating the pgdir
+-        // as the pgdir is same for the thread and par curr
+-        // freevm(p->pgdir)
+-        p->pid = 0;
+-        p->parent = 0;
+-        p->name[0] = 0;
+-        p->killed = 0;
+-        release(&ptable.lock);
+-        return pid;
+-      }
+-    }
+-    // No point waiting if we don't have any children.
+-    if (!havekids || curproc->killed) {
+-      release(&ptable.lock);
+-      return -1;
+-    }
+-    // Wait for children to exit.  (See wakeup1 call in proc_exit.)
+-    sleep(curproc, &ptable.lock);   //DOC: wait-sleep
+-  }
+-  
+-}
+-
+-
+-int
+-thread_exit(void)
+-{
+-  struct proc *p;
+-  struct proc *curproc = myproc();
+-  int fd;
+-
+-  if(curproc == initproc)
+-    panic("init exiting");
+-
+-  for (fd = 0; fd < NOFILE; fd++) {
+-    if (curproc -> ofile[fd]) {
+-      fileclose(curproc -> ofile[fd]);
+-      curproc -> ofile[fd] = 0;
+-    }
+-  }
+-
+-  begin_op();
+-  iput(curproc -> cwd);
+-  end_op();
+-  curproc -> cwd = 0;
+-
+-  acquire(&ptable.lock);
+-
+-  // Parent might be sleeping in wait().
+-  wakeup1(curproc->parent);
+-
+-  // Pass abandoned children to init.
+-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+-    if(p->parent == curproc){
+-      p->parent = initproc;
+-      if(p->state == ZOMBIE)
+-        wakeup1(initproc);
+-    }
+-  }
+-
+-  // Jump into the scheduler, never to return.
+-  curproc->state = ZOMBIE;
+-  sched();
+-  panic("zombie exit");
+-  
+-}
+\ No newline at end of file
+diff -ruN my_xv6-public/proc.h xv6-public/proc.h
+--- my_xv6-public/proc.h	2022-08-30 10:03:45.644244856 +0530
++++ xv6-public/proc.h	2022-09-05 23:18:01.615440124 +0530
+@@ -36,7 +36,6 @@
+ 
+ // Per-process state
+ struct proc {
+-  int is_thread;
+   uint sz;                     // Size of process memory (bytes)
+   pde_t* pgdir;                // Page table
+   char *kstack;                // Bottom of kernel stack for this process
+diff -ruN my_xv6-public/syscall.c xv6-public/syscall.c
+--- my_xv6-public/syscall.c	2022-09-05 11:09:17.055035306 +0530
++++ xv6-public/syscall.c	2022-09-05 23:18:01.619440373 +0530
+@@ -103,9 +103,6 @@
+ extern int sys_wait(void);
+ extern int sys_write(void);
+ extern int sys_uptime(void);
+-extern int sys_thread_create(void);
+-extern int sys_thread_join(void);
+-extern int sys_thread_exit(void);
+ 
+ static int (*syscalls[])(void) = {
+ [SYS_fork]    sys_fork,
+@@ -129,9 +126,6 @@
+ [SYS_link]    sys_link,
+ [SYS_mkdir]   sys_mkdir,
+ [SYS_close]   sys_close,
+-[SYS_thread_create] sys_thread_create,
+-[SYS_thread_join] sys_thread_join,
+-[SYS_thread_exit] sys_thread_exit
+ };
+ 
+ void
+diff -ruN my_xv6-public/syscall.h xv6-public/syscall.h
+--- my_xv6-public/syscall.h	2022-09-05 10:02:06.292203363 +0530
++++ xv6-public/syscall.h	2022-09-05 23:18:01.619440373 +0530
+@@ -20,6 +20,3 @@
+ #define SYS_link   19
+ #define SYS_mkdir  20
+ #define SYS_close  21
+-#define SYS_thread_create 22
+-#define SYS_thread_join 23
+-#define SYS_thread_exit 24
+diff -ruN my_xv6-public/sysproc.c xv6-public/sysproc.c
+--- my_xv6-public/sysproc.c	2022-09-05 14:31:59.052679209 +0530
++++ xv6-public/sysproc.c	2022-09-05 23:18:01.619440373 +0530
+@@ -89,29 +89,3 @@
+   release(&tickslock);
+   return xticks;
+ }
+-
+-int
+-sys_thread_create(void){
+-  int fcn;
+-  char* arg;
+-  char* stack;
+-  // int arg, stack;
+-  if(argint(0, &fcn)<0)
+-    return -1;
+-  if(argstr(1,&arg)<0)
+-    return -1;
+-  if(argstr(2,&stack)<0)
+-    return -1;
+-  //fcn make integer to void(*)(void*)
+-  return thread_create((void*)fcn,(void *)arg,(void*)stack);
+-
+-}
+-
+-int sys_thread_join(){
+-  thread_join();
+-  return 0;
+-}
+-
+-int sys_thread_exit(){
+-  return thread_exit();
+-}
+\ No newline at end of file
+diff -ruN my_xv6-public/thread.c xv6-public/thread.c
+--- my_xv6-public/thread.c	2022-09-05 23:05:29.163931239 +0530
++++ xv6-public/thread.c	1970-01-01 05:30:00.000000000 +0530
+@@ -1,125 +0,0 @@
+-#include "types.h"
+-#include "stat.h"
+-#include "user.h"
+-#include "x86.h"
+-
+-struct balance {
+-    char name[32];
+-    int amount;
+-};
+-
+-volatile int total_balance = 0;
+-struct thread_spinlock lock;
+-struct mutex_lock m_lock;
+-
+-volatile unsigned int delay (unsigned int d) {
+-   unsigned int i;
+-   for (i = 0; i < d; i++) {
+-       __asm volatile( "nop" ::: );
+-   }
+-
+-   return i;
+-}
+-
+-// copied spinlock
+-struct thread_spinlock {
+-  uint locked;       // Is the lock held?
+-
+-  // For debugging
+-  char *name;        // Name of lock.
+-//   struct cpu *cpu;   // The cpu holding the lock.
+-//   uint pcs[10];      // The call stack (an array of program counters)
+-//                      // that locked the lock.
+-};
+-
+-void thread_initlock(struct thread_spinlock *lk, char *name) {
+-  lk->name = name;
+-  lk->locked = 0;
+-}
+-
+-
+-
+-void thread_spin_lock(struct thread_spinlock* lk) {
+-
+-    // The xchg is atomic.
+-  while(xchg(&lk->locked, 1) != 0)
+-    ;
+-  __sync_synchronize();
+-}
+-
+-void thread_spin_unlock(struct thread_spinlock* lk) {
+-
+-  __sync_synchronize();
+-
+-  asm volatile("movl $0, %0" : "+m" (lk->locked) : );
+-}
+-
+-struct mutex_lock{
+-  uint locked;
+-};
+-
+-void mutex_initlock(struct mutex_lock* lk) {
+-   lk->locked = 0;
+-}
+-
+-void mutex_lock(struct mutex_lock* lk) {
+-  while(xchg(&lk->locked, 1) != 0)
+-    sleep(1);
+-  __sync_synchronize();
+-}
+-
+-void mutex_unlock(struct mutex_lock* lk) {
+-  __sync_synchronize();
+-
+-  asm volatile("movl $0, %0" : "+m" (lk->locked) : );
+-}
+-
+-void do_work(void *arg){
+-    int i;
+-    int old;
+-
+-    struct balance *b = (struct balance*) arg;
+-    printf(1, "Starting do_work: s:%s\n", b->name);
+-
+-    for (i = 0; i < b->amount; i++) {
+-        //  thread_spin_lock(&lock);
+-         mutex_lock(&m_lock);
+-         old = total_balance;
+-         delay(100000);
+-         total_balance = old + 1;
+-        //  thread_spin_unlock(&lock);
+-         mutex_unlock(&m_lock);
+-    }
+-
+-    printf(1, "Done s:%s\n", b->name);
+-
+-    thread_exit();
+-    return;
+-}
+-
+-int main(int argc, char *argv[]) {
+-
+-  struct balance b1 = {"b1", 3200};
+-  struct balance b2 = {"b2", 2800};
+-
+-  void *s1, *s2;
+-  int t1, t2, r1, r2;
+-
+-  s1 = malloc(4096);
+-  s2 = malloc(4096);
+-
+-  // Initialize thread_spin_lock
+-  //thread_initlock(&lock,"do work");
+-  mutex_initlock(&m_lock);
+-
+-  t1 = thread_create(do_work, (void*)&b1, s1);
+-  t2 = thread_create(do_work, (void*)&b2, s2);
+-
+-  r1 = thread_join();
+-  r2 = thread_join();
+-
+-  printf(1, "Threads finished: (%d):%d, (%d):%d, shared balance:%d\n",
+-      t1, r1, t2, r2, total_balance);
+-
+-  exit();
+-}
+\ No newline at end of file
+diff -ruN my_xv6-public/user.h xv6-public/user.h
+--- my_xv6-public/user.h	2022-09-05 11:08:30.974919475 +0530
++++ xv6-public/user.h	2022-09-05 23:18:01.619440373 +0530
+@@ -23,9 +23,6 @@
+ char* sbrk(int);
+ int sleep(int);
+ int uptime(void);
+-int thread_create(void(*)(void *), void *, void *);
+-int thread_join(void);
+-int thread_exit(void);
+ 
+ // ulib.c
+ int stat(const char*, struct stat*);
+diff -ruN my_xv6-public/usys.S xv6-public/usys.S
+--- my_xv6-public/usys.S	2022-09-05 10:38:31.910367002 +0530
++++ xv6-public/usys.S	2022-09-05 23:18:01.619440373 +0530
+@@ -29,6 +29,3 @@
+ SYSCALL(sbrk)
+ SYSCALL(sleep)
+ SYSCALL(uptime)
+-SYSCALL(thread_create)
+-SYSCALL(thread_join)
+-SYSCALL(thread_exit)
+\ No newline at end of file
+diff -ruN my_xv6-public/.vscode/configurationCache.log xv6-public/.vscode/configurationCache.log
+--- my_xv6-public/.vscode/configurationCache.log	2022-09-05 19:35:45.182623806 +0530
++++ xv6-public/.vscode/configurationCache.log	1970-01-01 05:30:00.000000000 +0530
+@@ -1 +0,0 @@
+-{"buildTargets":["_forktest","bio.o","bochs","bootasm.o","bootblock","bootmain.o","cat.o","clean","console.o","dist","dist-test","echo.o","entryother","entryother.o","exec.o","file.o","forktest.o","fs.img","fs.o","grep.o","ide.o","init.o","initcode","initcode.o","ioapic.o","kalloc.o","kbd.o","kernel","kernelmemfs","kill.o","lapic.o","ln.o","log.o","ls.o","main.o","mkdir.o","mkfs","mp.o","picirq.o","pipe.o","print","printf.o","proc.o","qemu","qemu-gdb","qemu-memfs","qemu-nox","qemu-nox-gdb","rm.o","sh.o","sleeplock.o","spinlock.o","stressfs.o","string.o","syscall.o","sysfile.o","sysproc.o","tags","tar","thread.o","trap.o","uart.o","ulib.o","umalloc.o","usertests.o","vectors.S","vm.o","wc.o","xv6.img","xv6.pdf","xv6memfs.img","zombie.o"],"launchTargets":["/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public>bootblock.o()","/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public>bootblockother.o()","/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public>initcode.out()","/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public>kernel()"],"customConfigurationProvider":{"workspaceBrowse":{"browsePath":["/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public"],"compilerArgs":["-fno-pic","-static","-fno-builtin","-fno-strict-aliasing","-O2","-Wall","-MD","-ggdb","-m32","-Werror","-fno-omit-frame-pointer","-fno-stack-protector","-fno-pie","-no-pie","-c","-o","vm.o","vm.c"],"compilerPath":"/usr/bin/gcc","windowsSdkVersion":""},"fileIndex":[["/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/bootmain.c",{"uri":{"$mid":1,"fsPath":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/bootmain.c","path":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/bootmain.c","scheme":"file"},"configuration":{"defines":[],"includePath":["/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public"],"forcedInclude":[],"intelliSenseMode":"gcc-x86","compilerPath":"/usr/bin/gcc","compilerArgs":["-fno-pic","-static","-fno-builtin","-fno-strict-aliasing","-O2","-Wall","-MD","-ggdb","-m32","-Werror","-fno-omit-frame-pointer","-fno-stack-protector","-fno-pie","-no-pie","-fno-pic","-O","-nostdinc","-c","bootmain.c"],"windowsSdkVersion":""},"compileCommand":{"command":"gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie -fno-pic -O -nostdinc -I. -c bootmain.c","directory":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public","file":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/bootmain.c"}}],["/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/bio.c",{"uri":{"$mid":1,"fsPath":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/bio.c","path":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/bio.c","scheme":"file"},"configuration":{"defines":[],"includePath":[],"forcedInclude":[],"intelliSenseMode":"gcc-x86","compilerPath":"/usr/bin/gcc","compilerArgs":["-fno-pic","-static","-fno-builtin","-fno-strict-aliasing","-O2","-Wall","-MD","-ggdb","-m32","-Werror","-fno-omit-frame-pointer","-fno-stack-protector","-fno-pie","-no-pie","-c","-o","bio.o","bio.c"],"windowsSdkVersion":""},"compileCommand":{"command":"gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o bio.o bio.c","directory":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public","file":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/bio.c"}}],["/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/console.c",{"uri":{"$mid":1,"fsPath":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/console.c","path":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/console.c","scheme":"file"},"configuration":{"defines":[],"includePath":[],"forcedInclude":[],"intelliSenseMode":"gcc-x86","compilerPath":"/usr/bin/gcc","compilerArgs":["-fno-pic","-static","-fno-builtin","-fno-strict-aliasing","-O2","-Wall","-MD","-ggdb","-m32","-Werror","-fno-omit-frame-pointer","-fno-stack-protector","-fno-pie","-no-pie","-c","-o","console.o","console.c"],"windowsSdkVersion":""},"compileCommand":{"command":"gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o console.o console.c","directory":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public","file":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/console.c"}}],["/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/exec.c",{"uri":{"$mid":1,"fsPath":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/exec.c","path":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/exec.c","scheme":"file"},"configuration":{"defines":[],"includePath":[],"forcedInclude":[],"intelliSenseMode":"gcc-x86","compilerPath":"/usr/bin/gcc","compilerArgs":["-fno-pic","-static","-fno-builtin","-fno-strict-aliasing","-O2","-Wall","-MD","-ggdb","-m32","-Werror","-fno-omit-frame-pointer","-fno-stack-protector","-fno-pie","-no-pie","-c","-o","exec.o","exec.c"],"windowsSdkVersion":""},"compileCommand":{"command":"gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o exec.o exec.c","directory":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public","file":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/exec.c"}}],["/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/file.c",{"uri":{"$mid":1,"fsPath":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/file.c","path":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/file.c","scheme":"file"},"configuration":{"defines":[],"includePath":[],"forcedInclude":[],"intelliSenseMode":"gcc-x86","compilerPath":"/usr/bin/gcc","compilerArgs":["-fno-pic","-static","-fno-builtin","-fno-strict-aliasing","-O2","-Wall","-MD","-ggdb","-m32","-Werror","-fno-omit-frame-pointer","-fno-stack-protector","-fno-pie","-no-pie","-c","-o","file.o","file.c"],"windowsSdkVersion":""},"compileCommand":{"command":"gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o file.o file.c","directory":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public","file":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/file.c"}}],["/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/fs.c",{"uri":{"$mid":1,"fsPath":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/fs.c","path":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/fs.c","scheme":"file"},"configuration":{"defines":[],"includePath":[],"forcedInclude":[],"intelliSenseMode":"gcc-x86","compilerPath":"/usr/bin/gcc","compilerArgs":["-fno-pic","-static","-fno-builtin","-fno-strict-aliasing","-O2","-Wall","-MD","-ggdb","-m32","-Werror","-fno-omit-frame-pointer","-fno-stack-protector","-fno-pie","-no-pie","-c","-o","fs.o","fs.c"],"windowsSdkVersion":""},"compileCommand":{"command":"gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o fs.o fs.c","directory":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public","file":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/fs.c"}}],["/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/ide.c",{"uri":{"$mid":1,"fsPath":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/ide.c","path":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/ide.c","scheme":"file"},"configuration":{"defines":[],"includePath":[],"forcedInclude":[],"intelliSenseMode":"gcc-x86","compilerPath":"/usr/bin/gcc","compilerArgs":["-fno-pic","-static","-fno-builtin","-fno-strict-aliasing","-O2","-Wall","-MD","-ggdb","-m32","-Werror","-fno-omit-frame-pointer","-fno-stack-protector","-fno-pie","-no-pie","-c","-o","ide.o","ide.c"],"windowsSdkVersion":""},"compileCommand":{"command":"gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o ide.o ide.c","directory":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public","file":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/ide.c"}}],["/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/ioapic.c",{"uri":{"$mid":1,"fsPath":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/ioapic.c","path":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/ioapic.c","scheme":"file"},"configuration":{"defines":[],"includePath":[],"forcedInclude":[],"intelliSenseMode":"gcc-x86","compilerPath":"/usr/bin/gcc","compilerArgs":["-fno-pic","-static","-fno-builtin","-fno-strict-aliasing","-O2","-Wall","-MD","-ggdb","-m32","-Werror","-fno-omit-frame-pointer","-fno-stack-protector","-fno-pie","-no-pie","-c","-o","ioapic.o","ioapic.c"],"windowsSdkVersion":""},"compileCommand":{"command":"gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o ioapic.o ioapic.c","directory":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public","file":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/ioapic.c"}}],["/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/kalloc.c",{"uri":{"$mid":1,"fsPath":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/kalloc.c","path":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/kalloc.c","scheme":"file"},"configuration":{"defines":[],"includePath":[],"forcedInclude":[],"intelliSenseMode":"gcc-x86","compilerPath":"/usr/bin/gcc","compilerArgs":["-fno-pic","-static","-fno-builtin","-fno-strict-aliasing","-O2","-Wall","-MD","-ggdb","-m32","-Werror","-fno-omit-frame-pointer","-fno-stack-protector","-fno-pie","-no-pie","-c","-o","kalloc.o","kalloc.c"],"windowsSdkVersion":""},"compileCommand":{"command":"gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o kalloc.o kalloc.c","directory":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public","file":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/kalloc.c"}}],["/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/kbd.c",{"uri":{"$mid":1,"fsPath":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/kbd.c","path":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/kbd.c","scheme":"file"},"configuration":{"defines":[],"includePath":[],"forcedInclude":[],"intelliSenseMode":"gcc-x86","compilerPath":"/usr/bin/gcc","compilerArgs":["-fno-pic","-static","-fno-builtin","-fno-strict-aliasing","-O2","-Wall","-MD","-ggdb","-m32","-Werror","-fno-omit-frame-pointer","-fno-stack-protector","-fno-pie","-no-pie","-c","-o","kbd.o","kbd.c"],"windowsSdkVersion":""},"compileCommand":{"command":"gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o kbd.o kbd.c","directory":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public","file":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/kbd.c"}}],["/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/lapic.c",{"uri":{"$mid":1,"fsPath":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/lapic.c","path":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/lapic.c","scheme":"file"},"configuration":{"defines":[],"includePath":[],"forcedInclude":[],"intelliSenseMode":"gcc-x86","compilerPath":"/usr/bin/gcc","compilerArgs":["-fno-pic","-static","-fno-builtin","-fno-strict-aliasing","-O2","-Wall","-MD","-ggdb","-m32","-Werror","-fno-omit-frame-pointer","-fno-stack-protector","-fno-pie","-no-pie","-c","-o","lapic.o","lapic.c"],"windowsSdkVersion":""},"compileCommand":{"command":"gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o lapic.o lapic.c","directory":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public","file":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/lapic.c"}}],["/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/log.c",{"uri":{"$mid":1,"fsPath":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/log.c","path":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/log.c","scheme":"file"},"configuration":{"defines":[],"includePath":[],"forcedInclude":[],"intelliSenseMode":"gcc-x86","compilerPath":"/usr/bin/gcc","compilerArgs":["-fno-pic","-static","-fno-builtin","-fno-strict-aliasing","-O2","-Wall","-MD","-ggdb","-m32","-Werror","-fno-omit-frame-pointer","-fno-stack-protector","-fno-pie","-no-pie","-c","-o","log.o","log.c"],"windowsSdkVersion":""},"compileCommand":{"command":"gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o log.o log.c","directory":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public","file":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/log.c"}}],["/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/main.c",{"uri":{"$mid":1,"fsPath":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/main.c","path":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/main.c","scheme":"file"},"configuration":{"defines":[],"includePath":[],"forcedInclude":[],"intelliSenseMode":"gcc-x86","compilerPath":"/usr/bin/gcc","compilerArgs":["-fno-pic","-static","-fno-builtin","-fno-strict-aliasing","-O2","-Wall","-MD","-ggdb","-m32","-Werror","-fno-omit-frame-pointer","-fno-stack-protector","-fno-pie","-no-pie","-c","-o","main.o","main.c"],"windowsSdkVersion":""},"compileCommand":{"command":"gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o main.o main.c","directory":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public","file":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/main.c"}}],["/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/mp.c",{"uri":{"$mid":1,"fsPath":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/mp.c","path":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/mp.c","scheme":"file"},"configuration":{"defines":[],"includePath":[],"forcedInclude":[],"intelliSenseMode":"gcc-x86","compilerPath":"/usr/bin/gcc","compilerArgs":["-fno-pic","-static","-fno-builtin","-fno-strict-aliasing","-O2","-Wall","-MD","-ggdb","-m32","-Werror","-fno-omit-frame-pointer","-fno-stack-protector","-fno-pie","-no-pie","-c","-o","mp.o","mp.c"],"windowsSdkVersion":""},"compileCommand":{"command":"gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o mp.o mp.c","directory":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public","file":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/mp.c"}}],["/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/picirq.c",{"uri":{"$mid":1,"fsPath":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/picirq.c","path":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/picirq.c","scheme":"file"},"configuration":{"defines":[],"includePath":[],"forcedInclude":[],"intelliSenseMode":"gcc-x86","compilerPath":"/usr/bin/gcc","compilerArgs":["-fno-pic","-static","-fno-builtin","-fno-strict-aliasing","-O2","-Wall","-MD","-ggdb","-m32","-Werror","-fno-omit-frame-pointer","-fno-stack-protector","-fno-pie","-no-pie","-c","-o","picirq.o","picirq.c"],"windowsSdkVersion":""},"compileCommand":{"command":"gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o picirq.o picirq.c","directory":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public","file":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/picirq.c"}}],["/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/pipe.c",{"uri":{"$mid":1,"fsPath":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/pipe.c","path":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/pipe.c","scheme":"file"},"configuration":{"defines":[],"includePath":[],"forcedInclude":[],"intelliSenseMode":"gcc-x86","compilerPath":"/usr/bin/gcc","compilerArgs":["-fno-pic","-static","-fno-builtin","-fno-strict-aliasing","-O2","-Wall","-MD","-ggdb","-m32","-Werror","-fno-omit-frame-pointer","-fno-stack-protector","-fno-pie","-no-pie","-c","-o","pipe.o","pipe.c"],"windowsSdkVersion":""},"compileCommand":{"command":"gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o pipe.o pipe.c","directory":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public","file":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/pipe.c"}}],["/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/proc.c",{"uri":{"$mid":1,"fsPath":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/proc.c","path":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/proc.c","scheme":"file"},"configuration":{"defines":[],"includePath":[],"forcedInclude":[],"intelliSenseMode":"gcc-x86","compilerPath":"/usr/bin/gcc","compilerArgs":["-fno-pic","-static","-fno-builtin","-fno-strict-aliasing","-O2","-Wall","-MD","-ggdb","-m32","-Werror","-fno-omit-frame-pointer","-fno-stack-protector","-fno-pie","-no-pie","-c","-o","proc.o","proc.c"],"windowsSdkVersion":""},"compileCommand":{"command":"gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o proc.o proc.c","directory":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public","file":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/proc.c"}}],["/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/sleeplock.c",{"uri":{"$mid":1,"fsPath":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/sleeplock.c","path":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/sleeplock.c","scheme":"file"},"configuration":{"defines":[],"includePath":[],"forcedInclude":[],"intelliSenseMode":"gcc-x86","compilerPath":"/usr/bin/gcc","compilerArgs":["-fno-pic","-static","-fno-builtin","-fno-strict-aliasing","-O2","-Wall","-MD","-ggdb","-m32","-Werror","-fno-omit-frame-pointer","-fno-stack-protector","-fno-pie","-no-pie","-c","-o","sleeplock.o","sleeplock.c"],"windowsSdkVersion":""},"compileCommand":{"command":"gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o sleeplock.o sleeplock.c","directory":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public","file":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/sleeplock.c"}}],["/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/spinlock.c",{"uri":{"$mid":1,"fsPath":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/spinlock.c","path":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/spinlock.c","scheme":"file"},"configuration":{"defines":[],"includePath":[],"forcedInclude":[],"intelliSenseMode":"gcc-x86","compilerPath":"/usr/bin/gcc","compilerArgs":["-fno-pic","-static","-fno-builtin","-fno-strict-aliasing","-O2","-Wall","-MD","-ggdb","-m32","-Werror","-fno-omit-frame-pointer","-fno-stack-protector","-fno-pie","-no-pie","-c","-o","spinlock.o","spinlock.c"],"windowsSdkVersion":""},"compileCommand":{"command":"gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o spinlock.o spinlock.c","directory":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public","file":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/spinlock.c"}}],["/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/string.c",{"uri":{"$mid":1,"fsPath":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/string.c","path":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/string.c","scheme":"file"},"configuration":{"defines":[],"includePath":[],"forcedInclude":[],"intelliSenseMode":"gcc-x86","compilerPath":"/usr/bin/gcc","compilerArgs":["-fno-pic","-static","-fno-builtin","-fno-strict-aliasing","-O2","-Wall","-MD","-ggdb","-m32","-Werror","-fno-omit-frame-pointer","-fno-stack-protector","-fno-pie","-no-pie","-c","-o","string.o","string.c"],"windowsSdkVersion":""},"compileCommand":{"command":"gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o string.o string.c","directory":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public","file":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/string.c"}}],["/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/syscall.c",{"uri":{"$mid":1,"fsPath":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/syscall.c","path":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/syscall.c","scheme":"file"},"configuration":{"defines":[],"includePath":[],"forcedInclude":[],"intelliSenseMode":"gcc-x86","compilerPath":"/usr/bin/gcc","compilerArgs":["-fno-pic","-static","-fno-builtin","-fno-strict-aliasing","-O2","-Wall","-MD","-ggdb","-m32","-Werror","-fno-omit-frame-pointer","-fno-stack-protector","-fno-pie","-no-pie","-c","-o","syscall.o","syscall.c"],"windowsSdkVersion":""},"compileCommand":{"command":"gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o syscall.o syscall.c","directory":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public","file":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/syscall.c"}}],["/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/sysfile.c",{"uri":{"$mid":1,"fsPath":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/sysfile.c","path":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/sysfile.c","scheme":"file"},"configuration":{"defines":[],"includePath":[],"forcedInclude":[],"intelliSenseMode":"gcc-x86","compilerPath":"/usr/bin/gcc","compilerArgs":["-fno-pic","-static","-fno-builtin","-fno-strict-aliasing","-O2","-Wall","-MD","-ggdb","-m32","-Werror","-fno-omit-frame-pointer","-fno-stack-protector","-fno-pie","-no-pie","-c","-o","sysfile.o","sysfile.c"],"windowsSdkVersion":""},"compileCommand":{"command":"gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o sysfile.o sysfile.c","directory":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public","file":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/sysfile.c"}}],["/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/sysproc.c",{"uri":{"$mid":1,"fsPath":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/sysproc.c","external":"file:///home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/sysproc.c","path":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/sysproc.c","scheme":"file"},"configuration":{"defines":[],"includePath":[],"forcedInclude":[],"intelliSenseMode":"gcc-x86","compilerPath":"/usr/bin/gcc","compilerArgs":["-fno-pic","-static","-fno-builtin","-fno-strict-aliasing","-O2","-Wall","-MD","-ggdb","-m32","-Werror","-fno-omit-frame-pointer","-fno-stack-protector","-fno-pie","-no-pie","-c","-o","sysproc.o","sysproc.c"],"windowsSdkVersion":""},"compileCommand":{"command":"gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o sysproc.o sysproc.c","directory":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public","file":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/sysproc.c"}}],["/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/trap.c",{"uri":{"$mid":1,"fsPath":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/trap.c","path":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/trap.c","scheme":"file"},"configuration":{"defines":[],"includePath":[],"forcedInclude":[],"intelliSenseMode":"gcc-x86","compilerPath":"/usr/bin/gcc","compilerArgs":["-fno-pic","-static","-fno-builtin","-fno-strict-aliasing","-O2","-Wall","-MD","-ggdb","-m32","-Werror","-fno-omit-frame-pointer","-fno-stack-protector","-fno-pie","-no-pie","-c","-o","trap.o","trap.c"],"windowsSdkVersion":""},"compileCommand":{"command":"gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o trap.o trap.c","directory":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public","file":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/trap.c"}}],["/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/uart.c",{"uri":{"$mid":1,"fsPath":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/uart.c","path":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/uart.c","scheme":"file"},"configuration":{"defines":[],"includePath":[],"forcedInclude":[],"intelliSenseMode":"gcc-x86","compilerPath":"/usr/bin/gcc","compilerArgs":["-fno-pic","-static","-fno-builtin","-fno-strict-aliasing","-O2","-Wall","-MD","-ggdb","-m32","-Werror","-fno-omit-frame-pointer","-fno-stack-protector","-fno-pie","-no-pie","-c","-o","uart.o","uart.c"],"windowsSdkVersion":""},"compileCommand":{"command":"gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o uart.o uart.c","directory":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public","file":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/uart.c"}}],["/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/vm.c",{"uri":{"$mid":1,"fsPath":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/vm.c","path":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/vm.c","scheme":"file"},"configuration":{"defines":[],"includePath":[],"forcedInclude":[],"intelliSenseMode":"gcc-x86","compilerPath":"/usr/bin/gcc","compilerArgs":["-fno-pic","-static","-fno-builtin","-fno-strict-aliasing","-O2","-Wall","-MD","-ggdb","-m32","-Werror","-fno-omit-frame-pointer","-fno-stack-protector","-fno-pie","-no-pie","-c","-o","vm.o","vm.c"],"windowsSdkVersion":""},"compileCommand":{"command":"gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o vm.o vm.c","directory":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public","file":"/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public/vm.c"}}]]}}
+\ No newline at end of file
+diff -ruN my_xv6-public/.vscode/dryrun.log xv6-public/.vscode/dryrun.log
+--- my_xv6-public/.vscode/dryrun.log	2022-09-05 19:35:37.541530810 +0530
++++ xv6-public/.vscode/dryrun.log	1970-01-01 05:30:00.000000000 +0530
+@@ -1,63 +0,0 @@
+-make --dry-run --always-make --keep-going --print-directory
+-make: Entering directory '/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public'
+- 
+-gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie -fno-pic -O -nostdinc -I. -c bootmain.c
+-gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie -fno-pic -nostdinc -I. -c bootasm.S
+-ld -m    elf_i386 -N -e start -Ttext 0x7C00 -o bootblock.o bootasm.o bootmain.o
+-objdump -S bootblock.o > bootblock.asm
+-objcopy -S -O binary -j .text bootblock.o bootblock
+-./sign.pl bootblock
+-gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o bio.o bio.c
+-gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o console.o console.c
+-gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o exec.o exec.c
+-gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o file.o file.c
+-gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o fs.o fs.c
+-gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o ide.o ide.c
+-gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o ioapic.o ioapic.c
+-gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o kalloc.o kalloc.c
+-gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o kbd.o kbd.c
+-gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o lapic.o lapic.c
+-gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o log.o log.c
+-gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o main.o main.c
+-gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o mp.o mp.c
+- 
+-gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o picirq.o picirq.c
+- 
+-gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o pipe.o pipe.c
+-gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o proc.o proc.c
+- 
+-gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o sleeplock.o sleeplock.c
+-gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o spinlock.o spinlock.c
+- 
+-gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o string.o string.c
+-gcc -m32 -gdwarf-2 -Wa,-divide   -c -o swtch.o swtch.S
+- 
+-gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o syscall.o syscall.c
+-gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o sysfile.o sysfile.c
+-gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o sysproc.o sysproc.c
+-gcc -m32 -gdwarf-2 -Wa,-divide   -c -o trapasm.o trapasm.S
+- 
+-gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o trap.o trap.c
+- 
+-gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o uart.o uart.c
+-./vectors.pl > vectors.S
+-gcc -m32 -gdwarf-2 -Wa,-divide   -c -o vectors.o vectors.S
+-gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie   -c -o vm.o vm.c
+-gcc -m32 -gdwarf-2 -Wa,-divide   -c -o entry.o entry.S
+- 
+-gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie -fno-pic -nostdinc -I. -c entryother.S
+-ld -m    elf_i386 -N -e start -Ttext 0x7000 -o bootblockother.o entryother.o
+-objcopy -S -O binary -j .text bootblockother.o entryother
+-objdump -S bootblockother.o > entryother.asm
+-gcc -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer -fno-stack-protector -fno-pie -no-pie -nostdinc -I. -c initcode.S
+-ld -m    elf_i386 -N -e start -Ttext 0 -o initcode.out initcode.o
+-objcopy -S -O binary initcode.out initcode
+-objdump -S initcode.o > initcode.asm
+-ld -m    elf_i386 -T kernel.ld -o kernel entry.o bio.o console.o exec.o file.o fs.o ide.o ioapic.o kalloc.o kbd.o lapic.o log.o main.o mp.o picirq.o pipe.o proc.o sleeplock.o spinlock.o string.o swtch.o syscall.o sysfile.o sysproc.o trapasm.o trap.o uart.o vectors.o vm.o  -b binary initcode entryother
+-objdump -S kernel > kernel.asm
+-objdump -t kernel | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$/d' > kernel.sym
+-dd if=/dev/zero of=xv6.img count=10000
+-dd if=bootblock of=xv6.img conv=notrunc
+-dd if=kernel of=xv6.img seek=1 conv=notrunc
+-make: Leaving directory '/home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public'
+- 
+diff -ruN my_xv6-public/.vscode/settings.json xv6-public/.vscode/settings.json
+--- my_xv6-public/.vscode/settings.json	2022-08-16 10:01:16.197040693 +0530
++++ xv6-public/.vscode/settings.json	1970-01-01 05:30:00.000000000 +0530
+@@ -1,3 +0,0 @@
+-{
+-    "makefile.extensionOutputFolder": "./.vscode"
+-}
+\ No newline at end of file
+diff -ruN my_xv6-public/.vscode/targets.log xv6-public/.vscode/targets.log
+--- my_xv6-public/.vscode/targets.log	2022-09-05 19:35:45.118522195 +0530
++++ xv6-public/.vscode/targets.log	1970-01-01 05:30:00.000000000 +0530
+@@ -1,1758 +0,0 @@
+-make all --print-data-base --no-builtin-variables --no-builtin-rules --question
+-make: *** No rule to make target 'all'.  Stop.
+-
+-# GNU Make 4.2.1
+-# Built for x86_64-pc-linux-gnu
+-# Copyright (C) 1988-2016 Free Software Foundation, Inc.
+-# License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+-# This is free software: you are free to change and redistribute it.
+-# There is NO WARRANTY, to the extent permitted by law.
+-
+-# Make data base, printed on Mon Sep  5 19:35:44 2022
+-
+-# Variables
+-
+-# 'override' directive
+-GNUMAKEFLAGS := 
+-# automatic
+-<D = $(patsubst %/,%,$(dir $<))
+-# automatic
+-?F = $(notdir $?)
+-# environment
+-DESKTOP_SESSION = ubuntu
+-# default
+-.SHELLFLAGS := -c
+-# makefile (from 'Makefile', line 58)
+-QEMU = $(shell if which qemu > /dev/null; then echo qemu; exit; elif which qemu-system-i386 > /dev/null; then echo qemu-system-i386; exit; elif which qemu-system-x86_64 > /dev/null; then echo qemu-system-x86_64; exit; else qemu=/Applications/Q.app/Contents/MacOS/i386-softmmu.app/Contents/MacOS/i386-softmmu; if test -x $$qemu; then echo $$qemu; exit; fi; fi; echo "***" 1>&2; echo "*** Error: Couldn't find a working QEMU executable." 1>&2; echo "*** Is the directory containing the qemu binary in your PATH" 1>&2; echo "*** or have you tried setting the QEMU variable in Makefile?" 1>&2; echo "***" 1>&2; exit 1)
+-# environment
+-XDG_SESSION_CLASS = user
+-# environment
+-XDG_SESSION_TYPE = x11
+-# automatic
+-?D = $(patsubst %/,%,$(dir $?))
+-# environment
+-IM_CONFIG_PHASE = 1
+-# automatic
+-@D = $(patsubst %/,%,$(dir $@))
+-# environment
+-XAUTHORITY = /run/user/1000/gdm/Xauthority
+-# environment
+-GDMSESSION = ubuntu
+-# environment
+-XMODIFIERS = @im=ibus
+-# makefile
+-CURDIR := /home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public
+-# makefile
+-SHELL = /bin/sh
+-# environment
+-VSCODE_NLS_CONFIG = {"locale":"en-gb","availableLanguages":{},"_languagePackSupport":true}
+-# environment
+-_ = /usr/share/code/code
+-# makefile (from 'Makefile', line 87)
+-CFLAGS = -fno-pic -static -fno-builtin -fno-strict-aliasing -O2 -Wall -MD -ggdb -m32 -Werror -fno-omit-frame-pointer $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector) -fno-pie -no-pie
+-# environment
+-JOURNAL_STREAM = 8:30800
+-# environment
+-XDG_CONFIG_DIRS = /etc/xdg/xdg-ubuntu:/etc/xdg
+-# makefile (from 'Makefile', line 215)
+-GDBPORT = $(shell expr `id -u` % 5000 + 25000)
+-# makefile (from 'zombie.d', line 1)
+-MAKEFILE_LIST :=  Makefile thread.d init.d log.d ioapic.d lapic.d usertests.d kill.d pipe.d initcode.d mkdir.d umalloc.d rm.d kalloc.d grep.d ide.d string.d syscall.d mp.d console.d sysfile.d sleeplock.d stressfs.d spinlock.d echo.d picirq.d vm.d kbd.d bootmain.d ln.d wc.d bio.d printf.d uart.d sysproc.d file.d ls.d entryother.d forktest.d proc.d ulib.d fs.d exec.d trap.d sh.d bootasm.d main.d cat.d zombie.d
+-# automatic
+-@F = $(notdir $@)
+-# environment
+-GIO_LAUNCHED_DESKTOP_FILE = /usr/share/applications/code.desktop
+-# environment
+-USERNAME = vedant
+-# makefile (from 'Makefile', line 217)
+-QEMUGDB = $(shell if $(QEMU) -help | grep -q '^-gdb'; then echo "-gdb tcp::$(GDBPORT)"; else echo "-s -p $(GDBPORT)"; fi)
+-# environment
+-XDG_DATA_DIRS = /usr/share/ubuntu:/usr/local/share/:/usr/share/:/var/lib/snapd/desktop
+-# environment
+-DBUS_SESSION_BUS_ADDRESS = unix:path=/run/user/1000/bus
+-# makefile (from 'Makefile', line 251)
+-EXTRA = mkfs.c ulib.c user.h cat.c echo.c forktest.c grep.c kill.c ln.c ls.c mkdir.c rm.c stressfs.c usertests.c wc.c zombie.c printf.c umalloc.c thread.c README dot-bochsrc *.pl toc.* runoff runoff1 runoff.list .gdbinit.tmpl gdbutil 
+-# makefile (from 'Makefile', line 75)
+-AS = $(TOOLPREFIX)gas
+-# makefile (from 'Makefile', line 1)
+-OBJS = bio.o console.o exec.o file.o fs.o ide.o ioapic.o kalloc.o kbd.o lapic.o log.o main.o mp.o picirq.o pipe.o proc.o sleeplock.o spinlock.o string.o swtch.o syscall.o sysfile.o sysproc.o trapasm.o trap.o uart.o vectors.o vm.o 
+-# environment
+-MANAGERPID = 977
+-# environment
+-LESSOPEN = | /usr/bin/lesspipe %s
+-# environment
+-VSCODE_CWD = /home/vedant
+-# default
+-MAKE_HOST := x86_64-pc-linux-gnu
+-# environment
+-PATH = /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
+-# makefile (from 'Makefile', line 76)
+-LD = $(TOOLPREFIX)ld
+-# environment
+-GPG_AGENT_INFO = /run/user/1000/gnupg/S.gpg-agent:0:1
+-# environment
+-SESSION_MANAGER = local/vedant-VirtualBox:@/tmp/.ICE-unix/1239,unix/vedant-VirtualBox:/tmp/.ICE-unix/1239
+-# environment
+-XDG_RUNTIME_DIR = /run/user/1000
+-# makefile (from 'Makefile', line 221)
+-CPUS := 2
+-# environment
+-XDG_MENU_PREFIX = gnome-
+-# environment
+-ELECTRON_RUN_AS_NODE = 1
+-# environment
+-INVOCATION_ID = 1f7ca8d4f6ca41f8a91b31a70df82cd5
+-# makefile (from 'Makefile', line 83)
+-LDFLAGS = -m $(shell $(LD) -V | grep elf_i386 2>/dev/null | head -n 1)
+-# makefile (from 'Makefile', line 146)
+-ULIB = ulib.o usys.o printf.o umalloc.o
+-# default
+-.FEATURES := target-specific order-only second-expansion else-if shortest-stem undefine oneshell archives jobserver output-sync check-symlink load
+-# environment
+-LS_COLORS = 
+-# environment
+-XDG_SESSION_DESKTOP = ubuntu
+-# environment
+-SSH_AUTH_SOCK = /run/user/1000/keyring/ssh
+-# environment
+-GIO_LAUNCHED_DESKTOP_FILE_PID = 1710
+-# automatic
+-%F = $(notdir $%)
+-# environment
+-DISPLAY = :0
+-# environment
+-PWD = /home/vedant/Desktop/Sem5/CS344/Assigment1/xv6-public
+-# default
+-.LOADED := 
+-# environment
+-SSH_AGENT_PID = 1201
+-# environment
+-ORIGINAL_XDG_CURRENT_DESKTOP = ubuntu:GNOME
+-# environment
+-GTK_MODULES = gail:atk-bridge
+-# environment
+-VSCODE_AMD_ENTRYPOINT = vs/workbench/api/node/extensionHostProcess
+-# environment
+-HOME = /home/vedant
+-# environment
+-LESSCLOSE = /usr/bin/lesspipe %s %s
+-# environment
+-VSCODE_CODE_CACHE_PATH = /home/vedant/.config/Code/CachedData/da76f93349a72022ca4670c1b84860304616aaa2
+-# environment
+-LOGNAME = vedant
+-# environment
+-APPLICATION_INSIGHTS_NO_DIAGNOSTIC_CHANNEL = 1
+-# environment
+-VSCODE_HANDLES_UNCAUGHT_ERRORS = true
+-# environment
+-GNOME_DESKTOP_SESSION_ID = this-is-deprecated
+-# automatic
+-^D = $(patsubst %/,%,$(dir $^))
+-# environment
+-MAKELEVEL := 0
+-# default
+-MAKE = $(MAKE_COMMAND)
+-# default
+-MAKECMDGOALS := all
+-# environment
+-QT_IM_MODULE = ibus
+-# environment
+-SHLVL = 0
+-# makefile (from 'Makefile', line 74)
+-CC = $(TOOLPREFIX)gcc
+-# makefile (from 'Makefile', line 39)
+-TOOLPREFIX := 
+-# environment
+-GNOME_SHELL_SESSION_MODE = ubuntu
+-# makefile (from 'Makefile', line 81)
+-ASFLAGS = -m32 -gdwarf-2 -Wa,-divide
+-# default
+-MAKE_VERSION := 4.2.1
+-# environment
+-USER = vedant
+-# makefile (from 'Makefile', line 200)
+-PRINT = runoff.list runoff.spec README toc.hdr toc.ftr $(FILES)
+-# makefile
+-.DEFAULT_GOAL := xv6.img
+-# environment
+-XDG_CURRENT_DESKTOP = Unity
+-# automatic
+-%D = $(patsubst %/,%,$(dir $%))
+-# default
+-MAKE_COMMAND := make
+-# default
+-.VARIABLES := 
+-# automatic
+-*F = $(notdir $*)
+-# environment
+-LANGUAGE = en_IN:en
+-# environment
+-VSCODE_IPC_HOOK = /run/user/1000/vscode-01e56b3e-1.70.0-main.sock
+-# makefile
+-MAKEFLAGS = pqrR
+-# environment
+-MFLAGS = -pqrR
+-# automatic
+-*D = $(patsubst %/,%,$(dir $*))
+-# makefile (from 'Makefile', line 134)
+-MEMFSOBJS = $(filter-out ide.o,$(OBJS)) memide.o
+-# automatic
+-+D = $(patsubst %/,%,$(dir $+))
+-# makefile (from 'Makefile', line 78)
+-OBJDUMP = $(TOOLPREFIX)objdump
+-# environment
+-GDK_BACKEND = x11
+-# automatic
+-+F = $(notdir $+)
+-# environment
+-QT_ACCESSIBILITY = 1
+-# makefile (from 'Makefile', line 223)
+-QEMUOPTS = -drive file=fs.img,index=1,media=disk,format=raw -drive file=xv6.img,index=0,media=disk,format=raw -smp $(CPUS) -m 512 $(QEMUEXTRA)
+-# 'override' directive
+-.SHELLSTATUS := 0
+-# default
+-MAKEFILES := 
+-# automatic
+-<F = $(notdir $<)
+-# environment
+-LC_ALL = C
+-# environment
+-GJS_DEBUG_TOPICS = JS ERROR;JS LOG
+-# automatic
+-^F = $(notdir $^)
+-# makefile (from 'Makefile', line 77)
+-OBJCOPY = $(TOOLPREFIX)objcopy
+-# default
+-SUFFIXES := 
+-# makefile (from 'Makefile', line 168)
+-UPROGS = _cat _echo _forktest _grep _init _kill _ln _ls _mkdir _rm _sh _stressfs _usertests _wc _zombie _thread 
+-# environment
+-CHROME_DESKTOP = code-url-handler.desktop
+-# environment
+-WINDOWPATH = 2
+-# default
+-.INCLUDE_DIRS = /usr/include /usr/local/include /usr/include
+-# environment
+-GJS_DEBUG_OUTPUT = stderr
+-# default
+-.RECIPEPREFIX := 
+-# environment
+-LANG = C
+-# environment
+-VSCODE_PID = 1710
+-# makefile (from 'Makefile', line 199)
+-FILES = $(shell grep -v '^#' runoff.list)
+-# variable set hash-table stats:
+-# Load=115/1024=11%, Rehash=0, Collisions=20/272=7%
+-
+-# Pattern-specific Variable Values
+-
+-# No pattern-specific variable values.
+-
+-# Directories
+-
+-# . (device 2053, inode 2897454): 271 files, no impossibilities.
+-
+-# 271 files, no impossibilities in 1 directories.
+-
+-# Implicit Rules
+-
+-_%: %.o ulib.o usys.o printf.o umalloc.o
+-#  recipe to execute (from 'Makefile', line 149):
+-	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o $@ $^
+-	$(OBJDUMP) -S $@ > $*.asm
+-	$(OBJDUMP) -t $@ | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > $*.sym
+-
+-# 1 implicit rules, 0 (0.0%) terminal.
+-
+-# Files
+-
+-# Not a target:
+-mmu.h:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-types.h:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+- 
+-#  File has not been updated.
+-
+-# Not a target:
+-memlayout.h:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-xv6.pdf: runoff.list runoff.spec README toc.hdr toc.ftr types.h param.h memlayout.h defs.h x86.h asm.h mmu.h elf.h date.h entry.S entryother.S main.c spinlock.h spinlock.c vm.c proc.h proc.c swtch.S kalloc.c traps.h vectors.pl trapasm.S trap.c syscall.h syscall.c sysproc.c buf.h sleeplock.h fcntl.h stat.h fs.h file.h ide.c bio.c sleeplock.c log.c fs.c file.c sysfile.c exec.c pipe.c string.c mp.h mp.c lapic.c ioapic.c kbd.h kbd.c console.c uart.c initcode.S usys.S init.c sh.c bootasm.S bootmain.c kernel.ld
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-#  recipe to execute (from 'Makefile', line 203):
+-	./runoff
+-	ls -l xv6.pdf
+-
+-wc.o: wc.c /usr/include/stdc-predef.h types.h stat.h user.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-_grep:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-console.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 14:20:19.264747935
+-#  File has been updated.
+-#  Successfully updated.
+-
+-qemu: fs.img xv6.img
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-#  recipe to execute (from 'Makefile', line 226):
+-	$(QEMU) -serial mon:stdio $(QEMUOPTS)
+-
+-kbd.o: kbd.c /usr/include/stdc-predef.h types.h x86.h defs.h kbd.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-pipe.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-picirq.o: picirq.c /usr/include/stdc-predef.h types.h x86.h traps.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-qemu-memfs: xv6memfs.img
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-#  recipe to execute (from 'Makefile', line 229):
+-	$(QEMU) -drive file=xv6memfs.img,index=0,media=disk,format=raw -smp $(CPUS) -m 256
+-
+-# Not a target:
+-stressfs.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-qemu-nox-gdb: fs.img xv6.img .gdbinit
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-#  recipe to execute (from 'Makefile', line 242):
+-	@echo "*** Now run 'gdb'." 1>&2
+-	$(QEMU) -nographic $(QEMUOPTS) -S $(QEMUGDB)
+-
+-spinlock.o: spinlock.c /usr/include/stdc-predef.h types.h defs.h param.h x86.h memlayout.h mmu.h proc.h spinlock.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-init.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-sleeplock.h:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-x86.h:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-all:
+-#  Command line target.
+-#  Implicit rule search has been done.
+-#  File does not exist.
+-#  File has not been updated.
+-
+-# Not a target:
+-_ln:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-bio.o: bio.c /usr/include/stdc-predef.h types.h defs.h param.h spinlock.h sleeplock.h fs.h buf.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-sysfile.o: sysfile.c /usr/include/stdc-predef.h types.h defs.h param.h stat.h mmu.h proc.h fs.h spinlock.h sleeplock.h file.h fcntl.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-fcntl.h:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-proc.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 14:20:20.19273345
+-#  File has been updated.
+-#  Successfully updated.
+-
+-.PHONY: dist-test dist
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-forktest.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 12:03:02.311233966
+-#  File has been updated.
+-#  Successfully updated.
+-
+-# Not a target:
+-vm.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 14:20:20.744724833
+-#  File has been updated.
+-#  Successfully updated.
+-
+-# Not a target:
+-string.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-thread.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-syscall.h:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-stat.h:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-bootblock: bootasm.S bootmain.c
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-#  recipe to execute (from 'Makefile', line 104):
+-	$(CC) $(CFLAGS) -fno-pic -O -nostdinc -I. -c bootmain.c
+-	$(CC) $(CFLAGS) -fno-pic -nostdinc -I. -c bootasm.S
+-	$(LD) $(LDFLAGS) -N -e start -Ttext 0x7C00 -o bootblock.o bootasm.o bootmain.o
+-	$(OBJDUMP) -S bootblock.o > bootblock.asm
+-	$(OBJCOPY) -S -O binary -j .text bootblock.o bootblock
+-	./sign.pl bootblock
+-
+-# Not a target:
+-zombie.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-cat.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-bio.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-main.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-grep.o: grep.c /usr/include/stdc-predef.h types.h stat.h user.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-.PRECIOUS: %.o
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-kalloc.o: kalloc.c /usr/include/stdc-predef.h types.h defs.h param.h memlayout.h mmu.h spinlock.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-README:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-trapasm.S:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-umalloc.o: umalloc.c /usr/include/stdc-predef.h types.h stat.h user.h param.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-string.o: string.c /usr/include/stdc-predef.h types.h x86.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-mkdir.o: mkdir.c /usr/include/stdc-predef.h types.h stat.h user.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-file.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 14:20:19.368746312
+-#  File has been updated.
+-#  Successfully updated.
+-
+-# Not a target:
+-_mkdir:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-uart.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 14:20:20.632726581
+-#  File has been updated.
+-#  Successfully updated.
+- 
+-
+-# Not a target:
+-sh.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-mp.o: mp.c /usr/include/stdc-predef.h types.h defs.h param.h memlayout.h mp.h x86.h mmu.h proc.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-ide.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-initcode.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 12:02:53.572723668
+-#  File has been updated.
+-#  Successfully updated.
+-
+-# Not a target:
+-ulib.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 12:03:01.770881988
+-#  File has been updated.
+-#  Successfully updated.
+-
+-lapic.o: lapic.c /usr/include/stdc-predef.h param.h types.h defs.h date.h memlayout.h traps.h mmu.h x86.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-ioapic.o: ioapic.c /usr/include/stdc-predef.h types.h defs.h traps.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-initcode.o: initcode.S syscall.h traps.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-exec.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-traps.h:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-fs.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-_init:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-usertests.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-ln.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 12:03:02.963653089
+-#  File has been updated.
+-#  Successfully updated.
+-
+-# Not a target:
+-_thread:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-tags: bio.o console.o exec.o file.o fs.o ide.o ioapic.o kalloc.o kbd.o lapic.o log.o main.o mp.o picirq.o pipe.o proc.o sleeplock.o spinlock.o string.o swtch.o syscall.o sysfile.o sysproc.o trapasm.o trap.o uart.o vectors.o vm.o entryother.S _init
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-#  recipe to execute (from 'Makefile', line 141):
+-	etags *.S *.c
+-
+-print: xv6.pdf
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-%.o:
+-#  Precious file (prerequisite of .PRECIOUS).
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-Makefile:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 11:59:37.516079155
+-#  File has been updated.
+-#  Successfully updated.
+-
+-kernel: bio.o console.o exec.o file.o fs.o ide.o ioapic.o kalloc.o kbd.o lapic.o log.o main.o mp.o picirq.o pipe.o proc.o sleeplock.o spinlock.o string.o swtch.o syscall.o sysfile.o sysproc.o trapasm.o trap.o uart.o vectors.o vm.o entry.o entryother initcode kernel.ld
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-#  recipe to execute (from 'Makefile', line 124):
+-	$(LD) $(LDFLAGS) -T kernel.ld -o kernel entry.o $(OBJS) -b binary initcode entryother
+-	$(OBJDUMP) -S kernel > kernel.asm
+-	$(OBJDUMP) -t kernel | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > kernel.sym
+-
+-# Not a target:
+-rm.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-ls.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-stressfs.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 12:03:04.028315983
+-#  File has been updated.
+-#  Successfully updated.
+-
+-kernelmemfs: bio.o console.o exec.o file.o fs.o ioapic.o kalloc.o kbd.o lapic.o log.o main.o mp.o picirq.o pipe.o proc.o sleeplock.o spinlock.o string.o swtch.o syscall.o sysfile.o sysproc.o trapasm.o trap.o uart.o vectors.o vm.o memide.o entry.o entryother initcode kernel.ld fs.img
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-#  recipe to execute (from 'Makefile', line 136):
+-	$(LD) $(LDFLAGS) -T kernel.ld -o kernelmemfs entry.o  $(MEMFSOBJS) -b binary initcode entryother fs.img
+-	$(OBJDUMP) -S kernelmemfs > kernelmemfs.asm
+-	$(OBJDUMP) -t kernelmemfs | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > kernelmemfs.sym
+-
+-# Not a target:
+-sleeplock.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 14:20:20.228732888
+-#  File has been updated.
+-#  Successfully updated.
+-
+-# Not a target:
+-kill.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 12:03:02.791542523
+-#  File has been updated.
+-#  Successfully updated.
+-
+-# Not a target:
+-sysproc.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-.gdbinit.tmpl:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-log.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-_stressfs:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-rm.o: rm.c /usr/include/stdc-predef.h types.h stat.h user.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-console.o: console.c /usr/include/stdc-predef.h types.h defs.h param.h traps.h spinlock.h sleeplock.h fs.h file.h memlayout.h mmu.h proc.h x86.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-elf.h:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-syscall.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 14:20:20.348731015
+-#  File has been updated.
+-#  Successfully updated.
+-
+-# Not a target:
+-echo.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 12:03:02.147128542
+-#  File has been updated.
+-#  Successfully updated.
+-
+-# Not a target:
+-asm.h:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-thread.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 14:32:40.596143515
+-#  File has been updated.
+-#  Successfully updated.
+-
+-_forktest: forktest.o ulib.o usys.o printf.o umalloc.o
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-#  recipe to execute (from 'Makefile', line 154):
+-	# forktest has less library code linked in - needs to be small
+-	# in order to be able to max out the proc table.
+-	$(LD) $(LDFLAGS) -N -e main -Ttext 0 -o _forktest forktest.o ulib.o usys.o
+-	$(OBJDUMP) -S _forktest > forktest.asm
+-
+-# Not a target:
+-ide.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 14:20:19.580743003
+-#  File has been updated.
+-#  Successfully updated.
+-
+-# Not a target:
+-_kill:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-wc.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-fs.h:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-kbd.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+- 
+-entry.o:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-picirq.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-vm.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-proc.o: proc.c /usr/include/stdc-predef.h types.h defs.h param.h memlayout.h mmu.h x86.h proc.h spinlock.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-pipe.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 14:20:20.040735822
+-#  File has been updated.
+-#  Successfully updated.
+-
+-# Not a target:
+-param.h:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-forktest.o: forktest.c /usr/include/stdc-predef.h types.h stat.h user.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-spinlock.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-trap.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-vectors.o:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-init.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 12:03:02.635442241
+-#  File has been updated.
+-#  Successfully updated.
+-
+-# Not a target:
+-sysfile.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-vm.o: vm.c /usr/include/stdc-predef.h param.h types.h defs.h x86.h memlayout.h mmu.h proc.h elf.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-usys.o:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-_rm:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-file.o: file.c /usr/include/stdc-predef.h types.h defs.h param.h fs.h spinlock.h sleeplock.h file.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-toc.hdr:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-uart.o: uart.c /usr/include/stdc-predef.h types.h defs.h param.h traps.h spinlock.h sleeplock.h fs.h file.h mmu.h proc.h x86.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-vectors.pl:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-user.h:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-initcode: initcode.S
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-#  recipe to execute (from 'Makefile', line 118):
+-	$(CC) $(CFLAGS) -nostdinc -I. -c initcode.S
+-	$(LD) $(LDFLAGS) -N -e start -Ttext 0 -o initcode.out initcode.o
+-	$(OBJCOPY) -S -O binary initcode.out initcode
+-	$(OBJDUMP) -S initcode.o > initcode.asm
+-
+-# Not a target:
+-swtch.S:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-printf.o: printf.c /usr/include/stdc-predef.h types.h stat.h user.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-ulib.o: ulib.c /usr/include/stdc-predef.h types.h stat.h fcntl.h user.h x86.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-grep.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-fs.img: mkfs README _cat _echo _forktest _grep _init _kill _ln _ls _mkdir _rm _sh _stressfs _usertests _wc _zombie _thread
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-#  recipe to execute (from 'Makefile', line 187):
+-	./mkfs fs.img README $(UPROGS)
+-
+-# Not a target:
+-zombie.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 12:03:05.381124456
+-#  File has been updated.
+-#  Successfully updated.
+-
+-# Not a target:
+-cat.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 12:03:02.035056545
+-#  File has been updated.
+-#  Successfully updated.
+-
+-# Not a target:
+-main.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 14:20:19.924737633
+-#  File has been updated.
+-#  Successfully updated.
+-
+-# Not a target:
+-kalloc.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-bootasm.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 12:02:49.060589252
+-#  File has been updated.
+-#  Successfully updated.
+-
+-# Not a target:
+-umalloc.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-ln.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-mkdir.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-bochs: fs.img xv6.img
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-#  recipe to execute (from 'Makefile', line 211):
+-	if [ ! -e .bochsrc ]; then ln -s dot-bochsrc .bochsrc; fi
+-	bochs -q
+-
+-# Not a target:
+-bootmain.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 12:02:49.024554287
+-#  File has been updated.
+-#  Successfully updated.
+-
+-# Not a target:
+-_sh:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-kbd.h:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-bootmain.o: bootmain.c types.h elf.h x86.h memlayout.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-mp.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-_cat:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-sh.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 12:03:03.792169547
+-#  File has been updated.
+-#  Successfully updated.
+-
+-# Not a target:
+-runoff.list:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-_echo:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-spinlock.h:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-lapic.c:
+- 
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-trap.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 14:20:20.584727331
+-#  File has been updated.
+-#  Successfully updated.
+-
+-# Not a target:
+-ioapic.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-ln.o: ln.c /usr/include/stdc-predef.h types.h stat.h user.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-stressfs.o: stressfs.c /usr/include/stdc-predef.h types.h stat.h user.h fs.h fcntl.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-.DEFAULT:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-mkfs: mkfs.c fs.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-#  recipe to execute (from 'Makefile', line 160):
+-	gcc -Werror -Wall -o mkfs mkfs.c
+-
+-xv6.img: bootblock kernel
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-#  recipe to execute (from 'Makefile', line 94):
+-	dd if=/dev/zero of=xv6.img count=10000
+-	dd if=bootblock of=xv6.img conv=notrunc
+-	dd if=kernel of=xv6.img seek=1 conv=notrunc
+-
+-sleeplock.o: sleeplock.c /usr/include/stdc-predef.h types.h defs.h param.h x86.h memlayout.h mmu.h proc.h spinlock.h sleeplock.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-printf.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 12:03:01.89496427
+-#  File has been updated.
+-#  Successfully updated.
+-
+-kill.o: kill.c /usr/include/stdc-predef.h types.h stat.h user.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-entry.S:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-fs.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 14:20:19.524743877
+-#  File has been updated.
+-#  Successfully updated.
+-
+-xv6memfs.img: bootblock kernelmemfs
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-#  recipe to execute (from 'Makefile', line 99):
+-	dd if=/dev/zero of=xv6memfs.img count=10000
+-	dd if=bootblock of=xv6memfs.img conv=notrunc
+-	dd if=kernelmemfs of=xv6memfs.img seek=1 conv=notrunc
+-
+-# Not a target:
+-usertests.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 12:03:05.024916399
+-#  File has been updated.
+-#  Successfully updated.
+-
+-# Not a target:
+-entryother.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 12:02:53.468634703
+-#  File has been updated.
+-#  Successfully updated.
+-
+-dist-test:
+-#  Phony target (prerequisite of .PHONY).
+-#  Implicit rule search has not been done.
+-#  File does not exist.
+-#  File has not been updated.
+-#  recipe to execute (from 'Makefile', line 271):
+-	rm -rf dist
+-	make dist
+-	rm -rf dist-test
+-	mkdir dist-test
+-	cp dist/* dist-test
+-	cd dist-test; $(MAKE) print
+-	cd dist-test; $(MAKE) bochs || true
+-	cd dist-test; $(MAKE) qemu
+-
+-syscall.o: syscall.c /usr/include/stdc-predef.h types.h defs.h param.h memlayout.h mmu.h proc.h x86.h syscall.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-echo.o: echo.c /usr/include/stdc-predef.h types.h stat.h user.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-file.h:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-qemu-gdb: fs.img xv6.img .gdbinit
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-#  recipe to execute (from 'Makefile', line 238):
+-	@echo "*** Now run 'gdb'." 1>&2
+-	$(QEMU) -serial mon:stdio $(QEMUOPTS) -S $(QEMUGDB)
+-
+-entryother.o: entryother.S asm.h memlayout.h mmu.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-ls.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 12:03:03.155773484
+-#  File has been updated.
+-#  Successfully updated.
+-
+-entryother: entryother.S
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-#  recipe to execute (from 'Makefile', line 112):
+-	$(CC) $(CFLAGS) -fno-pic -nostdinc -I. -c entryother.S
+-	$(LD) $(LDFLAGS) -N -e start -Ttext 0x7000 -o bootblockother.o entryother.o
+-	$(OBJCOPY) -S -O binary -j .text bootblockother.o entryother
+-	$(OBJDUMP) -S bootblockother.o > entryother.asm
+-
+-# Not a target:
+-sysproc.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 14:32:04.761171961
+-#  File has been updated.
+-#  Successfully updated.
+-
+-clean:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-#  recipe to execute (from 'Makefile', line 192):
+-	rm -f *.tex *.dvi *.idx *.aux *.log *.ind *.ilg \
+-	*.o *.d *.asm *.sym vectors.S bootblock entryother \
+-	initcode initcode.out kernel xv6.img fs.img kernelmemfs \
+-	xv6memfs.img mkfs .gdbinit \
+-	$(UPROGS)
+-
+-# Not a target:
+-console.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-log.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 14:20:19.888738195
+-#  File has been updated.
+-#  Successfully updated.
+-
+-# Not a target:
+-kill.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-mp.h:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-pipe.o: pipe.c /usr/include/stdc-predef.h types.h defs.h param.h mmu.h proc.h fs.h spinlock.h sleeplock.h file.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-tar:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-#  recipe to execute (from 'Makefile', line 283):
+-	rm -rf /tmp/xv6
+-	mkdir -p /tmp/xv6
+-	cp dist/* dist/.gdbinit.tmpl /tmp/xv6
+-	(cd /tmp; tar cf - xv6) | gzip >xv6-rev10.tar.gz  # the next one will be 10 (9/17)
+-
+-dist:
+-#  Phony target (prerequisite of .PHONY).
+-#  Implicit rule search has not been done.
+-#  File does not exist.
+-#  File has not been updated.
+-#  recipe to execute (from 'Makefile', line 260):
+-	rm -rf dist
+-	mkdir dist
+-	for i in $(FILES); \
+-	do \
+-		grep -v PAGEBREAK $$i >dist/$$i; \
+-	done
+-	sed '/CUT HERE/,$$d' Makefile >dist/Makefile
+-	echo >dist/runoff.spec
+-	cp $(EXTRA) dist
+-
+-# Not a target:
+-runoff.spec:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-wc.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 12:03:05.265056662
+-#  File has been updated.
+-#  Successfully updated.
+-
+-init.o: init.c /usr/include/stdc-predef.h types.h stat.h user.h fcntl.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-proc.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-kbd.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 14:20:19.720740817
+-#  File has been updated.
+-#  Successfully updated.
+-
+-# Not a target:
+-picirq.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 12:02:51.374782388
+-#  File has been updated.
+-#  Successfully updated.
+-
+-# Not a target:
+-forktest.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+- 
+-memide.o:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-vectors.S: vectors.pl
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-#  recipe to execute (from 'Makefile', line 144):
+-	./vectors.pl > vectors.S
+-
+-thread.o: thread.c /usr/include/stdc-predef.h types.h stat.h user.h x86.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-spinlock.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 14:20:20.292731889
+-#  File has been updated.
+-#  Successfully updated.
+-
+-# Not a target:
+-usys.S:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-qemu-nox: fs.img xv6.img
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-#  recipe to execute (from 'Makefile', line 232):
+-	$(QEMU) -nographic $(QEMUOPTS)
+-
+-# Not a target:
+-_zombie:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-zombie.o: zombie.c /usr/include/stdc-predef.h types.h stat.h user.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-rm.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 12:03:03.395922942
+-#  File has been updated.
+-#  Successfully updated.
+-
+-cat.o: cat.c /usr/include/stdc-predef.h types.h stat.h user.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-main.o: main.c /usr/include/stdc-predef.h types.h defs.h param.h memlayout.h mmu.h proc.h x86.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-sysfile.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 14:20:20.476729016
+-#  File has been updated.
+-#  Successfully updated.
+-
+-bootasm.o: bootasm.S asm.h memlayout.h mmu.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-file.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-defs.h:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-uart.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-initcode.S:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-bootasm.S:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-trapasm.o:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-string.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 12:02:52.343655082
+-#  File has been updated.
+-#  Successfully updated.
+-
+-sh.o: sh.c /usr/include/stdc-predef.h types.h user.h fcntl.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-printf.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-ulib.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-ide.o: ide.c /usr/include/stdc-predef.h types.h defs.h param.h memlayout.h mmu.h proc.h x86.h traps.h spinlock.h sleeplock.h fs.h buf.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-trap.o: trap.c /usr/include/stdc-predef.h types.h defs.h param.h memlayout.h mmu.h proc.h x86.h traps.h spinlock.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-grep.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 12:03:02.507359959
+-#  File has been updated.
+-#  Successfully updated.
+-
+-# Not a target:
+-_usertests:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-bio.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 14:20:19.172749372
+-#  File has been updated.
+-#  Successfully updated.
+-
+-# Not a target:
+-exec.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 14:20:19.316747124
+-#  File has been updated.
+-#  Successfully updated.
+-
+-# Not a target:
+-kalloc.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 14:20:19.684741379
+-#  File has been updated.
+-#  Successfully updated.
+-
+-# Not a target:
+-umalloc.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 12:03:01.975017355
+-#  File has been updated.
+-#  Successfully updated.
+-
+-exec.o: exec.c /usr/include/stdc-predef.h types.h param.h memlayout.h mmu.h proc.h defs.h x86.h elf.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-mkdir.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 12:03:03.275848214
+-#  File has been updated.
+-#  Successfully updated.
+-
+-# Not a target:
+-toc.ftr:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-_wc:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-bootmain.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-fs.o: fs.c /usr/include/stdc-predef.h types.h defs.h param.h stat.h mmu.h proc.h spinlock.h sleeplock.h fs.h buf.h file.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-proc.h:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-usertests.o: usertests.c /usr/include/stdc-predef.h param.h types.h stat.h user.h fs.h fcntl.h syscall.h traps.h memlayout.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-mp.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 14:20:19.980736759
+-#  File has been updated.
+-#  Successfully updated.
+-
+-# Not a target:
+-date.h:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-/usr/include/stdc-predef.h:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-mkfs.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-lapic.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 14:20:19.808739444
+-#  File has been updated.
+-#  Successfully updated.
+-
+-# Not a target:
+-ioapic.d:
+-#  Implicit rule search has been done.
+-#  Last modified 2022-09-05 14:20:19.624742316
+-#  File has been updated.
+-#  Successfully updated.
+-
+-ls.o: ls.c /usr/include/stdc-predef.h types.h stat.h user.h fs.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+- 
+-# Not a target:
+-sleeplock.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-_ls:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-kernel.ld:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-sysproc.o: sysproc.c /usr/include/stdc-predef.h types.h x86.h defs.h date.h param.h memlayout.h mmu.h proc.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-buf.h:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-.gdbinit: .gdbinit.tmpl
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-#  recipe to execute (from 'Makefile', line 235):
+-	sed "s/localhost:1234/localhost:$(GDBPORT)/" < $^ > $@
+-
+-log.o: log.c /usr/include/stdc-predef.h types.h defs.h param.h spinlock.h sleeplock.h fs.h buf.h
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-entryother.S:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-syscall.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-echo.c:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# Not a target:
+-swtch.o:
+-#  Implicit rule search has not been done.
+-#  Modification time never checked.
+-#  File has not been updated.
+-
+-# files hash-table stats:
+-# Load=233/1024=23%, Rehash=0, Collisions=99/902=11%
+-# VPATH Search Paths
+-
+-# No 'vpath' search paths.
+-
+-# No general ('VPATH' variable) search path.
+-
+-# strcache buffers: 1 (0) / strings = 298 / storage = 2479 B / avg = 8 B
+-# current buf: size = 8162 B / used = 2479 B / count = 298 / avg = 8 B
+-
+-# strcache performance: lookups = 1110 / hit rate = 73%
+-# hash-table stats:
+-# Load=298/8192=4%, Rehash=0, Collisions=141/1110=13%
+-# Finished Make data base on Mon Sep  5 19:35:45 2022
+-
+- 

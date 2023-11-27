@@ -1,0 +1,187 @@
+<title>Vdbench encryptionTestOutput002/config.html</title><pre>
+Output from script /home/pranshu/Sem5/CS344/Assignment-4/Assignment-4/vdbench/linux/config.sh: 
+
+Monday 14 November 2022 11:57:13 AM IST
+>>>>>uname -a
+Linux pranshu-HP-ENVY-x360-Convertible-15-dr1xxx 5.15.0-52-generic #58-Ubuntu SMP Thu Oct 13 08:03:55 UTC 2022 x86_64 x86_64 x86_64 GNU/Linux
+Monday 14 November 2022 11:57:13 AM IST
+>>>>>ifconfig -a
+lo: flags=73<UP,LOOPBACK,RUNNING>  mtu 65536
+        inet 127.0.0.1  netmask 255.0.0.0
+        inet6 ::1  prefixlen 128  scopeid 0x10<host>
+        loop  txqueuelen 1000  (Local Loopback)
+        RX packets 9238  bytes 1607953 (1.6 MB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 9238  bytes 1607953 (1.6 MB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+lxcbr0: flags=4099<UP,BROADCAST,MULTICAST>  mtu 1500
+        inet 10.0.3.1  netmask 255.255.255.0  broadcast 10.0.3.255
+        ether 00:16:3e:00:00:00  txqueuelen 1000  (Ethernet)
+        RX packets 0  bytes 0 (0.0 B)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 0  bytes 0 (0.0 B)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+virbr0: flags=4099<UP,BROADCAST,MULTICAST>  mtu 1500
+        inet 192.168.122.1  netmask 255.255.255.0  broadcast 192.168.122.255
+        ether 52:54:00:fd:d2:8b  txqueuelen 1000  (Ethernet)
+        RX packets 0  bytes 0 (0.0 B)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 0  bytes 0 (0.0 B)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+wlo1: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet 10.150.35.178  netmask 255.255.240.0  broadcast 10.150.47.255
+        inet6 fe80::4da6:b3e1:4459:4b  prefixlen 64  scopeid 0x20<link>
+        ether 3c:58:c2:c3:c0:2b  txqueuelen 1000  (Ethernet)
+        RX packets 275793  bytes 123451309 (123.4 MB)
+        RX errors 0  dropped 4  overruns 0  frame 0
+        TX packets 52530  bytes 16527828 (16.5 MB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+Monday 14 November 2022 11:57:13 AM IST
+>>>>>id
+uid=0(root) gid=0(root) groups=0(root)
+Monday 14 November 2022 11:57:13 AM IST
+>>>>>mount
+sysfs on /sys type sysfs (rw,nosuid,nodev,noexec,relatime)
+proc on /proc type proc (rw,nosuid,nodev,noexec,relatime)
+udev on /dev type devtmpfs (rw,nosuid,relatime,size=7982948k,nr_inodes=1995737,mode=755,inode64)
+devpts on /dev/pts type devpts (rw,nosuid,noexec,relatime,gid=5,mode=620,ptmxmode=000)
+tmpfs on /run type tmpfs (rw,nosuid,nodev,noexec,relatime,size=1604088k,mode=755,inode64)
+/dev/nvme0n1p5 on / type ext4 (rw,relatime,errors=remount-ro)
+securityfs on /sys/kernel/security type securityfs (rw,nosuid,nodev,noexec,relatime)
+tmpfs on /dev/shm type tmpfs (rw,nosuid,nodev,inode64)
+tmpfs on /run/lock type tmpfs (rw,nosuid,nodev,noexec,relatime,size=5120k,inode64)
+cgroup2 on /sys/fs/cgroup type cgroup2 (rw,nosuid,nodev,noexec,relatime)
+pstore on /sys/fs/pstore type pstore (rw,nosuid,nodev,noexec,relatime)
+efivarfs on /sys/firmware/efi/efivars type efivarfs (rw,nosuid,nodev,noexec,relatime)
+bpf on /sys/fs/bpf type bpf (rw,nosuid,nodev,noexec,relatime,mode=700)
+systemd-1 on /proc/sys/fs/binfmt_misc type autofs (rw,relatime,fd=29,pgrp=1,timeout=0,minproto=5,maxproto=5,direct,pipe_ino=19397)
+mqueue on /dev/mqueue type mqueue (rw,nosuid,nodev,noexec,relatime)
+hugetlbfs on /dev/hugepages type hugetlbfs (rw,relatime,pagesize=2M)
+debugfs on /sys/kernel/debug type debugfs (rw,nosuid,nodev,noexec,relatime)
+tracefs on /sys/kernel/tracing type tracefs (rw,nosuid,nodev,noexec,relatime)
+fusectl on /sys/fs/fuse/connections type fusectl (rw,nosuid,nodev,noexec,relatime)
+configfs on /sys/kernel/config type configfs (rw,nosuid,nodev,noexec,relatime)
+none on /run/credentials/systemd-sysusers.service type ramfs (ro,nosuid,nodev,noexec,relatime,mode=700)
+tmpfs on /run/qemu type tmpfs (rw,nosuid,nodev,relatime,mode=755,inode64)
+/var/lib/snapd/snaps/android-studio_124.snap on /snap/android-studio/124 type squashfs (ro,nodev,relatime,errors=continue,x-gdu.hide)
+/var/lib/snapd/snaps/bare_5.snap on /snap/bare/5 type squashfs (ro,nodev,relatime,errors=continue,x-gdu.hide)
+/var/lib/snapd/snaps/android-studio_125.snap on /snap/android-studio/125 type squashfs (ro,nodev,relatime,errors=continue,x-gdu.hide)
+/var/lib/snapd/snaps/brave_185.snap on /snap/brave/185 type squashfs (ro,nodev,relatime,errors=continue,x-gdu.hide)
+/var/lib/snapd/snaps/brave_186.snap on /snap/brave/186 type squashfs (ro,nodev,relatime,errors=continue,x-gdu.hide)
+/var/lib/snapd/snaps/code_112.snap on /snap/code/112 type squashfs (ro,nodev,relatime,errors=continue,x-gdu.hide)
+/var/lib/snapd/snaps/code_113.snap on /snap/code/113 type squashfs (ro,nodev,relatime,errors=continue,x-gdu.hide)
+/var/lib/snapd/snaps/core_13741.snap on /snap/core/13741 type squashfs (ro,nodev,relatime,errors=continue,x-gdu.hide)
+/var/lib/snapd/snaps/core_13886.snap on /snap/core/13886 type squashfs (ro,nodev,relatime,errors=continue,x-gdu.hide)
+/var/lib/snapd/snaps/core18_2566.snap on /snap/core18/2566 type squashfs (ro,nodev,relatime,errors=continue,x-gdu.hide)
+/var/lib/snapd/snaps/core18_2620.snap on /snap/core18/2620 type squashfs (ro,nodev,relatime,errors=continue,x-gdu.hide)
+/var/lib/snapd/snaps/core20_1634.snap on /snap/core20/1634 type squashfs (ro,nodev,relatime,errors=continue,x-gdu.hide)
+/var/lib/snapd/snaps/core20_1695.snap on /snap/core20/1695 type squashfs (ro,nodev,relatime,errors=continue,x-gdu.hide)
+/var/lib/snapd/snaps/core22_275.snap on /snap/core22/275 type squashfs (ro,nodev,relatime,errors=continue,x-gdu.hide)
+/var/lib/snapd/snaps/core22_310.snap on /snap/core22/310 type squashfs (ro,nodev,relatime,errors=continue,x-gdu.hide)
+/var/lib/snapd/snaps/firefox_2015.snap on /snap/firefox/2015 type squashfs (ro,nodev,relatime,errors=continue,x-gdu.hide)
+/var/lib/snapd/snaps/firefox_2067.snap on /snap/firefox/2067 type squashfs (ro,nodev,relatime,errors=continue,x-gdu.hide)
+/var/lib/snapd/snaps/gnome-3-38-2004_115.snap on /snap/gnome-3-38-2004/115 type squashfs (ro,nodev,relatime,errors=continue,x-gdu.hide)
+/var/lib/snapd/snaps/gnome-3-38-2004_119.snap on /snap/gnome-3-38-2004/119 type squashfs (ro,nodev,relatime,errors=continue,x-gdu.hide)
+/var/lib/snapd/snaps/gtk-common-themes_1534.snap on /snap/gtk-common-themes/1534 type squashfs (ro,nodev,relatime,errors=continue,x-gdu.hide)
+/var/lib/snapd/snaps/hunspell-dictionaries-1-7-2004_2.snap on /snap/hunspell-dictionaries-1-7-2004/2 type squashfs (ro,nodev,relatime,errors=continue,x-gdu.hide)
+/var/lib/snapd/snaps/gtk-common-themes_1535.snap on /snap/gtk-common-themes/1535 type squashfs (ro,nodev,relatime,errors=continue,x-gdu.hide)
+/var/lib/snapd/snaps/obs-studio_1284.snap on /snap/obs-studio/1284 type squashfs (ro,nodev,relatime,errors=continue,x-gdu.hide)
+/var/lib/snapd/snaps/snap-store_582.snap on /snap/snap-store/582 type squashfs (ro,nodev,relatime,errors=continue,x-gdu.hide)
+/var/lib/snapd/snaps/snap-store_599.snap on /snap/snap-store/599 type squashfs (ro,nodev,relatime,errors=continue,x-gdu.hide)
+/var/lib/snapd/snaps/snapd_17029.snap on /snap/snapd/17029 type squashfs (ro,nodev,relatime,errors=continue,x-gdu.hide)
+/var/lib/snapd/snaps/snapd_17336.snap on /snap/snapd/17336 type squashfs (ro,nodev,relatime,errors=continue,x-gdu.hide)
+/var/lib/snapd/snaps/snapd-desktop-integration_10.snap on /snap/snapd-desktop-integration/10 type squashfs (ro,nodev,relatime,errors=continue,x-gdu.hide)
+/var/lib/snapd/snaps/snapd-desktop-integration_14.snap on /snap/snapd-desktop-integration/14 type squashfs (ro,nodev,relatime,errors=continue,x-gdu.hide)
+/var/lib/snapd/snaps/telegram-desktop_4256.snap on /snap/telegram-desktop/4256 type squashfs (ro,nodev,relatime,errors=continue,x-gdu.hide)
+/var/lib/snapd/snaps/telegram-desktop_4312.snap on /snap/telegram-desktop/4312 type squashfs (ro,nodev,relatime,errors=continue,x-gdu.hide)
+/dev/nvme0n1p5 on /var/snap/firefox/common/host-hunspell type ext4 (ro,noexec,noatime,errors=remount-ro)
+/dev/nvme0n1p1 on /boot/efi type vfat (rw,relatime,fmask=0077,dmask=0077,codepage=437,iocharset=iso8859-1,shortname=mixed,errors=remount-ro)
+binfmt_misc on /proc/sys/fs/binfmt_misc type binfmt_misc (rw,nosuid,nodev,noexec,relatime)
+lxcfs on /var/lib/lxcfs type fuse.lxcfs (rw,nosuid,nodev,relatime,user_id=0,group_id=0,allow_other)
+tmpfs on /run/snapd/ns type tmpfs (rw,nosuid,nodev,noexec,relatime,size=1604088k,mode=755,inode64)
+nsfs on /run/snapd/ns/snapd-desktop-integration.mnt type nsfs (rw)
+tmpfs on /run/user/1000 type tmpfs (rw,nosuid,nodev,relatime,size=1604088k,nr_inodes=401022,mode=700,uid=1000,gid=1000,inode64)
+gvfsd-fuse on /run/user/1000/gvfs type fuse.gvfsd-fuse (rw,nosuid,nodev,relatime,user_id=1000,group_id=1000)
+portal on /run/user/1000/doc type fuse.portal (rw,nosuid,nodev,relatime,user_id=1000,group_id=1000)
+nsfs on /run/snapd/ns/snap-store.mnt type nsfs (rw)
+nsfs on /run/snapd/ns/brave.mnt type nsfs (rw)
+nsfs on /run/snapd/ns/firefox.mnt type nsfs (rw)
+zfs_compress on /zfs_compress type zfs (rw,xattr,noacl)
+zfs_nocompress on /zfs_nocompress type zfs (rw,xattr,noacl)
+zfs_noencrypt on /zfs_noencrypt type zfs (rw,xattr,noacl)
+zfs_encrypt on /zfs_encrypt type zfs (rw,xattr,noacl)
+zfs_encrypt/encrypted on /zfs_encrypt/encrypted type zfs (rw,xattr,noacl)
+Monday 14 November 2022 11:57:13 AM IST
+>>>>>memory
+MemTotal:       16040880 kB
+MemFree:         6995636 kB
+MemAvailable:   11344280 kB
+Buffers:          222756 kB
+Cached:          4981824 kB
+SwapCached:            0 kB
+Active:          1992816 kB
+Inactive:        5508432 kB
+Active(anon):       5156 kB
+Inactive(anon):  3003692 kB
+Active(file):    1987660 kB
+Inactive(file):  2504740 kB
+Unevictable:      580512 kB
+Mlocked:              16 kB
+SwapTotal:       2097148 kB
+SwapFree:        2097148 kB
+Dirty:               292 kB
+Writeback:             0 kB
+AnonPages:       2877328 kB
+Mapped:           841620 kB
+Shmem:            712180 kB
+KReclaimable:     195724 kB
+Slab:             371028 kB
+SReclaimable:     195724 kB
+SUnreclaim:       175304 kB
+KernelStack:       26892 kB
+PageTables:        48572 kB
+NFS_Unstable:          0 kB
+Bounce:                0 kB
+WritebackTmp:          0 kB
+CommitLimit:    10117588 kB
+Committed_AS:   12642328 kB
+VmallocTotal:   34359738367 kB
+VmallocUsed:      157744 kB
+VmallocChunk:          0 kB
+Percpu:            10304 kB
+HardwareCorrupted:     0 kB
+AnonHugePages:         0 kB
+ShmemHugePages:        0 kB
+ShmemPmdMapped:        0 kB
+FileHugePages:         0 kB
+FilePmdMapped:         0 kB
+HugePages_Total:       0
+HugePages_Free:        0
+HugePages_Rsvd:        0
+HugePages_Surp:        0
+Hugepagesize:       2048 kB
+Hugetlb:               0 kB
+DirectMap4k:      493948 kB
+DirectMap2M:    10692608 kB
+DirectMap1G:     6291456 kB
+               total        used        free      shared  buff/cache   available
+Mem:        16040880     3644940     6995636      712180     5400304    11344280
+Low:        16040880     9045244     6995636
+High:              0           0           0
+Swap:        2097148           0     2097148
+Monday 14 November 2022 11:57:13 AM IST
+>>>>>ps -ef | grep -i vdb
+pranshu    25944    2048  1 11:19 ?        00:00:30 /opt/google/chrome/chrome --enable-crashpad /home/pranshu/Sem5/CS344/Assignment-4/Assignment-4/vdbench/compressionTestOutput001/summary.html
+root       46579   46564  0 11:57 pts/1    00:00:00 sudo ./vdbench -f encryption_test.conf -o encryptionTestOutput+
+root       46580   46579  0 11:57 pts/2    00:00:00 sudo ./vdbench -f encryption_test.conf -o encryptionTestOutput+
+root       46581   46580  0 11:57 pts/2    00:00:00 /bin/bash ./vdbench -f encryption_test.conf -o encryptionTestOutput+
+root       46583   46581 56 11:57 pts/2    00:00:00 java -client -Xmx512m -Xms64m -cp ./:./classes:./vdbench.jar Vdb.Vdbmain -f encryption_test.conf -o encryptionTestOutput+
+root       46611   46583  0 11:57 pts/2    00:00:00 /bin/bash /home/pranshu/Sem5/CS344/Assignment-4/Assignment-4/vdbench/vdbench SlaveJvm -m localhost -n localhost-10-221114-11.57.13.305 -l localhost-0 -p 5570
+root       46615   46611 32 11:57 pts/2    00:00:00 java -client -Xmx1024m -Xms128m -cp /home/pranshu/Sem5/CS344/Assignment-4/Assignment-4/vdbench/:/home/pranshu/Sem5/CS344/Assignment-4/Assignment-4/vdbench/classes:/home/pranshu/Sem5/CS344/Assignment-4/Assignment-4/vdbench/vdbench.jar Vdb.SlaveJvm SlaveJvm -m localhost -n localhost-10-221114-11.57.13.305 -l localhost-0 -p 5570
+root       46651   46583  0 11:57 pts/2    00:00:00 /bin/bash /home/pranshu/Sem5/CS344/Assignment-4/Assignment-4/vdbench/linux/config.sh -o /home/pranshu/Sem5/CS344/Assignment-4/Assignment-4/vdbench/encryptionTestOutput002 localhost
+root       46670   46651  0 11:57 pts/2    00:00:00 grep -i vdb
+

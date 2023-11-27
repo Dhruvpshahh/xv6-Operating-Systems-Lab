@@ -1,0 +1,18 @@
+<title>Vdbench compressionTestOutput004/parmfile.html</title><pre>
+
+* Contents of parameter file: /home/pranshu/Sem5/CS344/Assignment-4/Assignment-4/vdbench/compression_test.conf
+
+compratio=2.5
+fsd=fsd1,anchor=/zfs_compress,depth=2,width=2,files=2,size=8M
+fsd=fsd2,anchor=/zfs_nocompress,depth=2,width=2,files=2,size=8M
+
+fwd=fwd1_1,fsd=fsd1,operation=write,xfersize=256k,fileio=sequential,fileselect=random,threads=2
+fwd=fwd1_2,fsd=fsd1,operation=read,xfersize=256k,fileio=sequential,fileselect=random,threads=2
+
+fwd=fwd2_1,fsd=fsd2,operation=write,xfersize=256k,fileio=sequential,fileselect=random,threads=2
+fwd=fwd2_2,fsd=fsd2,operation=read,xfersize=256k,fileio=sequential,fileselect=random,threads=2
+
+rd=write_compressed,fwd=fwd1_1,fwdrate=100,format=yes,elapsed=10,interval=1
+rd=read_compressed,fwd=fwd1_2,fwdrate=100,format=no,elapsed=10,interval=1
+rd=write_uncompressed,fwd=fwd2_1,fwdrate=100,format=yes,elapsed=10,interval=1
+rd=read_uncompressed,fwd=fwd2_2,fwdrate=100,format=no,elapsed=10,interval=1

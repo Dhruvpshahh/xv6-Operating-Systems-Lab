@@ -1,0 +1,2380 @@
+diff -ruN G36/.cvsignore xv6-public_original/.cvsignore
+--- G36/.cvsignore	1970-01-01 05:30:00.000000000 +0530
++++ xv6-public_original/.cvsignore	2022-08-12 23:04:14.366780881 +0530
+@@ -0,0 +1,16 @@
++*.asm
++*.d
++*.sym
++_*
++kernel
++user1
++userfs
++usertests
++xv6.img
++vectors.S
++bochsout.txt
++bootblock
++bootother
++bootother.out
++parport.out
++fmt
+diff -ruN G36/defs.h xv6-public_original/defs.h
+--- G36/defs.h	2022-10-04 19:12:34.000000000 +0530
++++ xv6-public_original/defs.h	2022-08-12 23:04:14.370780968 +0530
+@@ -8,7 +8,6 @@
+ struct spinlock;
+ struct sleeplock;
+ struct stat;
+-struct processInfo;
+ struct superblock;
+ 
+ // bio.c
+@@ -121,11 +120,6 @@
+ int             wait(void);
+ void            wakeup(void*);
+ void            yield(void);
+-int             getNumProc(void);
+-int             getMaxPid(void);
+-int             getProcInfo(int, struct processInfo*);
+-int             setBurstTime(int);
+-int             getBurstTime(void);
+ 
+ // swtch.S
+ void            swtch(struct context**, struct context*);
+diff -ruN G36/.dir-locals.el xv6-public_original/.dir-locals.el
+--- G36/.dir-locals.el	1970-01-01 05:30:00.000000000 +0530
++++ xv6-public_original/.dir-locals.el	2022-08-12 23:04:14.366780881 +0530
+@@ -0,0 +1,4 @@
++((c-mode
++  (indent-tabs-mode . nil)
++  (c-file-style . "bsd")
++  (c-basic-offset . 2)))
+diff -ruN G36/.gdbinit.tmpl xv6-public_original/.gdbinit.tmpl
+--- G36/.gdbinit.tmpl	1970-01-01 05:30:00.000000000 +0530
++++ xv6-public_original/.gdbinit.tmpl	2022-08-12 23:04:14.366780881 +0530
+@@ -0,0 +1,27 @@
++set $lastcs = -1
++
++define hook-stop
++  # There doesn't seem to be a good way to detect if we're in 16- or
++  # 32-bit mode, but in 32-bit mode we always run with CS == 8 in the
++  # kernel and CS == 35 in user space
++  if $cs == 8 || $cs == 35
++    if $lastcs != 8 && $lastcs != 35
++      set architecture i386
++    end
++    x/i $pc
++  else
++    if $lastcs == -1 || $lastcs == 8 || $lastcs == 35
++      set architecture i8086
++    end
++    # Translate the segment:offset into a physical address
++    printf "[%4x:%4x] ", $cs, $eip
++    x/i $cs*16+$eip
++  end
++  set $lastcs = $cs
++end
++
++echo + target remote localhost:1234\n
++target remote localhost:1234
++
++echo + symbol-file kernel\n
++symbol-file kernel
+diff -ruN G36/getMaxPid.c xv6-public_original/getMaxPid.c
+--- G36/getMaxPid.c	2022-09-26 11:57:24.000000000 +0530
++++ xv6-public_original/getMaxPid.c	1970-01-01 05:30:00.000000000 +0530
+@@ -1,14 +0,0 @@
+-#include "types.h"
+-#include "stat.h"
+-#include "user.h"
+-
+-int main(void)
+-{
+-	int mpid = getMaxPid();
+-	if(mpid < 0)
+-	{
+-		printf(1, "No active processes in process table.\n");
+-	}
+-	else printf(1, "Greatest PID: %d\n", getMaxPid());
+-	exit();
+-}
+\ No newline at end of file
+diff -ruN G36/getNumProc.c xv6-public_original/getNumProc.c
+--- G36/getNumProc.c	2022-09-26 11:57:35.000000000 +0530
++++ xv6-public_original/getNumProc.c	1970-01-01 05:30:00.000000000 +0530
+@@ -1,10 +0,0 @@
+-
+-#include "types.h"
+-#include "stat.h"
+-#include "user.h"
+-
+-int main(void)
+-{
+-	printf(1, "Number of currently active processes: %d\n", getNumProc());
+-	exit();
+-}
+\ No newline at end of file
+diff -ruN G36/getProcInfo.c xv6-public_original/getProcInfo.c
+--- G36/getProcInfo.c	2022-10-05 17:35:51.000000000 +0530
++++ xv6-public_original/getProcInfo.c	1970-01-01 05:30:00.000000000 +0530
+@@ -1,36 +0,0 @@
+-#include "types.h"
+-#include "stat.h"
+-#include "user.h"
+-#include "processInfo.h"
+-
+-int main(int argc, char *argv[])
+-{	
+-	if(argc < 2){
+-		printf(2, "Usage: getProcInfo...\n");
+-		exit();
+-	}
+-
+-	for(int i=1; i<argc; i++)
+-	{
+-		struct processInfo* ptr;
+-		ptr = (struct processInfo*) malloc(sizeof(struct processInfo));
+-		
+-		if(getProcInfo(atoi(argv[i]), ptr) < 0)
+-		{
+-			// printf(2, "getProcInfo: %s failed\n", argv[i]);
+-			// break;
+-			printf(2,"Process pid=%d, doesnt exist in the process table\n",atoi(argv[i]));
+-		}
+-		else{
+-			printf(1, "Name: %s\n", ptr->name);
+-			printf(1, "PPID: %d\n", ptr->ppid);
+-			printf(1, "Psize: %d\n", ptr->psize);
+-			printf(1, "Context switches: %d\n", ptr->numberContextSwitches);
+-			printf(1, "State: %s\n", ptr->state);
+-			printf(1, "Killed: %d\n", ptr->killed);
+-			printf(1, "Burst Time: %d\n", ptr->burst_time);
+-		}
+-	}
+-
+-	exit();
+-}
+diff -ruN G36/.git/config xv6-public_original/.git/config
+--- G36/.git/config	1970-01-01 05:30:00.000000000 +0530
++++ xv6-public_original/.git/config	2022-08-12 23:04:14.366780881 +0530
+@@ -0,0 +1,11 @@
++[core]
++	repositoryformatversion = 0
++	filemode = true
++	bare = false
++	logallrefupdates = true
++[remote "origin"]
++	url = https://github.com/mit-pdos/xv6-public.git
++	fetch = +refs/heads/*:refs/remotes/origin/*
++[branch "master"]
++	remote = origin
++	merge = refs/heads/master
+diff -ruN G36/.git/description xv6-public_original/.git/description
+--- G36/.git/description	1970-01-01 05:30:00.000000000 +0530
++++ xv6-public_original/.git/description	2022-08-12 23:03:57.022407387 +0530
+@@ -0,0 +1 @@
++Unnamed repository; edit this file 'description' to name the repository.
+diff -ruN G36/.git/HEAD xv6-public_original/.git/HEAD
+--- G36/.git/HEAD	1970-01-01 05:30:00.000000000 +0530
++++ xv6-public_original/.git/HEAD	2022-08-12 23:04:14.366780881 +0530
+@@ -0,0 +1 @@
++ref: refs/heads/master
+diff -ruN G36/.git/hooks/applypatch-msg.sample xv6-public_original/.git/hooks/applypatch-msg.sample
+--- G36/.git/hooks/applypatch-msg.sample	1970-01-01 05:30:00.000000000 +0530
++++ xv6-public_original/.git/hooks/applypatch-msg.sample	2022-08-12 23:03:57.022407387 +0530
+@@ -0,0 +1,15 @@
++#!/bin/sh
++#
++# An example hook script to check the commit log message taken by
++# applypatch from an e-mail message.
++#
++# The hook should exit with non-zero status after issuing an
++# appropriate message if it wants to stop the commit.  The hook is
++# allowed to edit the commit message file.
++#
++# To enable this hook, rename this file to "applypatch-msg".
++
++. git-sh-setup
++commitmsg="$(git rev-parse --git-path hooks/commit-msg)"
++test -x "$commitmsg" && exec "$commitmsg" ${1+"$@"}
++:
+diff -ruN G36/.git/hooks/commit-msg.sample xv6-public_original/.git/hooks/commit-msg.sample
+--- G36/.git/hooks/commit-msg.sample	1970-01-01 05:30:00.000000000 +0530
++++ xv6-public_original/.git/hooks/commit-msg.sample	2022-08-12 23:03:57.022407387 +0530
+@@ -0,0 +1,24 @@
++#!/bin/sh
++#
++# An example hook script to check the commit log message.
++# Called by "git commit" with one argument, the name of the file
++# that has the commit message.  The hook should exit with non-zero
++# status after issuing an appropriate message if it wants to stop the
++# commit.  The hook is allowed to edit the commit message file.
++#
++# To enable this hook, rename this file to "commit-msg".
++
++# Uncomment the below to add a Signed-off-by line to the message.
++# Doing this in a hook is a bad idea in general, but the prepare-commit-msg
++# hook is more suited to it.
++#
++# SOB=$(git var GIT_AUTHOR_IDENT | sed -n 's/^\(.*>\).*$/Signed-off-by: \1/p')
++# grep -qs "^$SOB" "$1" || echo "$SOB" >> "$1"
++
++# This example catches duplicate Signed-off-by lines.
++
++test "" = "$(grep '^Signed-off-by: ' "$1" |
++	 sort | uniq -c | sed -e '/^[ 	]*1[ 	]/d')" || {
++	echo >&2 Duplicate Signed-off-by lines.
++	exit 1
++}
+diff -ruN G36/.git/hooks/fsmonitor-watchman.sample xv6-public_original/.git/hooks/fsmonitor-watchman.sample
+--- G36/.git/hooks/fsmonitor-watchman.sample	1970-01-01 05:30:00.000000000 +0530
++++ xv6-public_original/.git/hooks/fsmonitor-watchman.sample	2022-08-12 23:03:57.022407387 +0530
+@@ -0,0 +1,173 @@
++#!/usr/bin/perl
++
++use strict;
++use warnings;
++use IPC::Open2;
++
++# An example hook script to integrate Watchman
++# (https://facebook.github.io/watchman/) with git to speed up detecting
++# new and modified files.
++#
++# The hook is passed a version (currently 2) and last update token
++# formatted as a string and outputs to stdout a new update token and
++# all files that have been modified since the update token. Paths must
++# be relative to the root of the working tree and separated by a single NUL.
++#
++# To enable this hook, rename this file to "query-watchman" and set
++# 'git config core.fsmonitor .git/hooks/query-watchman'
++#
++my ($version, $last_update_token) = @ARGV;
++
++# Uncomment for debugging
++# print STDERR "$0 $version $last_update_token\n";
++
++# Check the hook interface version
++if ($version ne 2) {
++	die "Unsupported query-fsmonitor hook version '$version'.\n" .
++	    "Falling back to scanning...\n";
++}
++
++my $git_work_tree = get_working_dir();
++
++my $retry = 1;
++
++my $json_pkg;
++eval {
++	require JSON::XS;
++	$json_pkg = "JSON::XS";
++	1;
++} or do {
++	require JSON::PP;
++	$json_pkg = "JSON::PP";
++};
++
++launch_watchman();
++
++sub launch_watchman {
++	my $o = watchman_query();
++	if (is_work_tree_watched($o)) {
++		output_result($o->{clock}, @{$o->{files}});
++	}
++}
++
++sub output_result {
++	my ($clockid, @files) = @_;
++
++	# Uncomment for debugging watchman output
++	# open (my $fh, ">", ".git/watchman-output.out");
++	# binmode $fh, ":utf8";
++	# print $fh "$clockid\n@files\n";
++	# close $fh;
++
++	binmode STDOUT, ":utf8";
++	print $clockid;
++	print "\0";
++	local $, = "\0";
++	print @files;
++}
++
++sub watchman_clock {
++	my $response = qx/watchman clock "$git_work_tree"/;
++	die "Failed to get clock id on '$git_work_tree'.\n" .
++		"Falling back to scanning...\n" if $? != 0;
++
++	return $json_pkg->new->utf8->decode($response);
++}
++
++sub watchman_query {
++	my $pid = open2(\*CHLD_OUT, \*CHLD_IN, 'watchman -j --no-pretty')
++	or die "open2() failed: $!\n" .
++	"Falling back to scanning...\n";
++
++	# In the query expression below we're asking for names of files that
++	# changed since $last_update_token but not from the .git folder.
++	#
++	# To accomplish this, we're using the "since" generator to use the
++	# recency index to select candidate nodes and "fields" to limit the
++	# output to file names only. Then we're using the "expression" term to
++	# further constrain the results.
++	if (substr($last_update_token, 0, 1) eq "c") {
++		$last_update_token = "\"$last_update_token\"";
++	}
++	my $query = <<"	END";
++		["query", "$git_work_tree", {
++			"since": $last_update_token,
++			"fields": ["name"],
++			"expression": ["not", ["dirname", ".git"]]
++		}]
++	END
++
++	# Uncomment for debugging the watchman query
++	# open (my $fh, ">", ".git/watchman-query.json");
++	# print $fh $query;
++	# close $fh;
++
++	print CHLD_IN $query;
++	close CHLD_IN;
++	my $response = do {local $/; <CHLD_OUT>};
++
++	# Uncomment for debugging the watch response
++	# open ($fh, ">", ".git/watchman-response.json");
++	# print $fh $response;
++	# close $fh;
++
++	die "Watchman: command returned no output.\n" .
++	"Falling back to scanning...\n" if $response eq "";
++	die "Watchman: command returned invalid output: $response\n" .
++	"Falling back to scanning...\n" unless $response =~ /^\{/;
++
++	return $json_pkg->new->utf8->decode($response);
++}
++
++sub is_work_tree_watched {
++	my ($output) = @_;
++	my $error = $output->{error};
++	if ($retry > 0 and $error and $error =~ m/unable to resolve root .* directory (.*) is not watched/) {
++		$retry--;
++		my $response = qx/watchman watch "$git_work_tree"/;
++		die "Failed to make watchman watch '$git_work_tree'.\n" .
++		    "Falling back to scanning...\n" if $? != 0;
++		$output = $json_pkg->new->utf8->decode($response);
++		$error = $output->{error};
++		die "Watchman: $error.\n" .
++		"Falling back to scanning...\n" if $error;
++
++		# Uncomment for debugging watchman output
++		# open (my $fh, ">", ".git/watchman-output.out");
++		# close $fh;
++
++		# Watchman will always return all files on the first query so
++		# return the fast "everything is dirty" flag to git and do the
++		# Watchman query just to get it over with now so we won't pay
++		# the cost in git to look up each individual file.
++		my $o = watchman_clock();
++		$error = $output->{error};
++
++		die "Watchman: $error.\n" .
++		"Falling back to scanning...\n" if $error;
++
++		output_result($o->{clock}, ("/"));
++		$last_update_token = $o->{clock};
++
++		eval { launch_watchman() };
++		return 0;
++	}
++
++	die "Watchman: $error.\n" .
++	"Falling back to scanning...\n" if $error;
++
++	return 1;
++}
++
++sub get_working_dir {
++	my $working_dir;
++	if ($^O =~ 'msys' || $^O =~ 'cygwin') {
++		$working_dir = Win32::GetCwd();
++		$working_dir =~ tr/\\/\//;
++	} else {
++		require Cwd;
++		$working_dir = Cwd::cwd();
++	}
++
++	return $working_dir;
++}
+diff -ruN G36/.git/hooks/post-update.sample xv6-public_original/.git/hooks/post-update.sample
+--- G36/.git/hooks/post-update.sample	1970-01-01 05:30:00.000000000 +0530
++++ xv6-public_original/.git/hooks/post-update.sample	2022-08-12 23:03:57.022407387 +0530
+@@ -0,0 +1,8 @@
++#!/bin/sh
++#
++# An example hook script to prepare a packed repository for use over
++# dumb transports.
++#
++# To enable this hook, rename this file to "post-update".
++
++exec git update-server-info
+diff -ruN G36/.git/hooks/pre-applypatch.sample xv6-public_original/.git/hooks/pre-applypatch.sample
+--- G36/.git/hooks/pre-applypatch.sample	1970-01-01 05:30:00.000000000 +0530
++++ xv6-public_original/.git/hooks/pre-applypatch.sample	2022-08-12 23:03:57.022407387 +0530
+@@ -0,0 +1,14 @@
++#!/bin/sh
++#
++# An example hook script to verify what is about to be committed
++# by applypatch from an e-mail message.
++#
++# The hook should exit with non-zero status after issuing an
++# appropriate message if it wants to stop the commit.
++#
++# To enable this hook, rename this file to "pre-applypatch".
++
++. git-sh-setup
++precommit="$(git rev-parse --git-path hooks/pre-commit)"
++test -x "$precommit" && exec "$precommit" ${1+"$@"}
++:
+diff -ruN G36/.git/hooks/pre-commit.sample xv6-public_original/.git/hooks/pre-commit.sample
+--- G36/.git/hooks/pre-commit.sample	1970-01-01 05:30:00.000000000 +0530
++++ xv6-public_original/.git/hooks/pre-commit.sample	2022-08-12 23:03:57.022407387 +0530
+@@ -0,0 +1,49 @@
++#!/bin/sh
++#
++# An example hook script to verify what is about to be committed.
++# Called by "git commit" with no arguments.  The hook should
++# exit with non-zero status after issuing an appropriate message if
++# it wants to stop the commit.
++#
++# To enable this hook, rename this file to "pre-commit".
++
++if git rev-parse --verify HEAD >/dev/null 2>&1
++then
++	against=HEAD
++else
++	# Initial commit: diff against an empty tree object
++	against=$(git hash-object -t tree /dev/null)
++fi
++
++# If you want to allow non-ASCII filenames set this variable to true.
++allownonascii=$(git config --type=bool hooks.allownonascii)
++
++# Redirect output to stderr.
++exec 1>&2
++
++# Cross platform projects tend to avoid non-ASCII filenames; prevent
++# them from being added to the repository. We exploit the fact that the
++# printable range starts at the space character and ends with tilde.
++if [ "$allownonascii" != "true" ] &&
++	# Note that the use of brackets around a tr range is ok here, (it's
++	# even required, for portability to Solaris 10's /usr/bin/tr), since
++	# the square bracket bytes happen to fall in the designated range.
++	test $(git diff --cached --name-only --diff-filter=A -z $against |
++	  LC_ALL=C tr -d '[ -~]\0' | wc -c) != 0
++then
++	cat <<\EOF
++Error: Attempt to add a non-ASCII file name.
++
++This can cause problems if you want to work with people on other platforms.
++
++To be portable it is advisable to rename the file.
++
++If you know what you are doing you can disable this check using:
++
++  git config hooks.allownonascii true
++EOF
++	exit 1
++fi
++
++# If there are whitespace errors, print the offending file names and fail.
++exec git diff-index --check --cached $against --
+diff -ruN G36/.git/hooks/pre-merge-commit.sample xv6-public_original/.git/hooks/pre-merge-commit.sample
+--- G36/.git/hooks/pre-merge-commit.sample	1970-01-01 05:30:00.000000000 +0530
++++ xv6-public_original/.git/hooks/pre-merge-commit.sample	2022-08-12 23:03:57.022407387 +0530
+@@ -0,0 +1,13 @@
++#!/bin/sh
++#
++# An example hook script to verify what is about to be committed.
++# Called by "git merge" with no arguments.  The hook should
++# exit with non-zero status after issuing an appropriate message to
++# stderr if it wants to stop the merge commit.
++#
++# To enable this hook, rename this file to "pre-merge-commit".
++
++. git-sh-setup
++test -x "$GIT_DIR/hooks/pre-commit" &&
++        exec "$GIT_DIR/hooks/pre-commit"
++:
+diff -ruN G36/.git/hooks/prepare-commit-msg.sample xv6-public_original/.git/hooks/prepare-commit-msg.sample
+--- G36/.git/hooks/prepare-commit-msg.sample	1970-01-01 05:30:00.000000000 +0530
++++ xv6-public_original/.git/hooks/prepare-commit-msg.sample	2022-08-12 23:03:57.022407387 +0530
+@@ -0,0 +1,42 @@
++#!/bin/sh
++#
++# An example hook script to prepare the commit log message.
++# Called by "git commit" with the name of the file that has the
++# commit message, followed by the description of the commit
++# message's source.  The hook's purpose is to edit the commit
++# message file.  If the hook fails with a non-zero status,
++# the commit is aborted.
++#
++# To enable this hook, rename this file to "prepare-commit-msg".
++
++# This hook includes three examples. The first one removes the
++# "# Please enter the commit message..." help message.
++#
++# The second includes the output of "git diff --name-status -r"
++# into the message, just before the "git status" output.  It is
++# commented because it doesn't cope with --amend or with squashed
++# commits.
++#
++# The third example adds a Signed-off-by line to the message, that can
++# still be edited.  This is rarely a good idea.
++
++COMMIT_MSG_FILE=$1
++COMMIT_SOURCE=$2
++SHA1=$3
++
++/usr/bin/perl -i.bak -ne 'print unless(m/^. Please enter the commit message/..m/^#$/)' "$COMMIT_MSG_FILE"
++
++# case "$COMMIT_SOURCE,$SHA1" in
++#  ,|template,)
++#    /usr/bin/perl -i.bak -pe '
++#       print "\n" . `git diff --cached --name-status -r`
++# 	 if /^#/ && $first++ == 0' "$COMMIT_MSG_FILE" ;;
++#  *) ;;
++# esac
++
++# SOB=$(git var GIT_COMMITTER_IDENT | sed -n 's/^\(.*>\).*$/Signed-off-by: \1/p')
++# git interpret-trailers --in-place --trailer "$SOB" "$COMMIT_MSG_FILE"
++# if test -z "$COMMIT_SOURCE"
++# then
++#   /usr/bin/perl -i.bak -pe 'print "\n" if !$first_line++' "$COMMIT_MSG_FILE"
++# fi
+diff -ruN G36/.git/hooks/pre-push.sample xv6-public_original/.git/hooks/pre-push.sample
+--- G36/.git/hooks/pre-push.sample	1970-01-01 05:30:00.000000000 +0530
++++ xv6-public_original/.git/hooks/pre-push.sample	2022-08-12 23:03:57.022407387 +0530
+@@ -0,0 +1,53 @@
++#!/bin/sh
++
++# An example hook script to verify what is about to be pushed.  Called by "git
++# push" after it has checked the remote status, but before anything has been
++# pushed.  If this script exits with a non-zero status nothing will be pushed.
++#
++# This hook is called with the following parameters:
++#
++# $1 -- Name of the remote to which the push is being done
++# $2 -- URL to which the push is being done
++#
++# If pushing without using a named remote those arguments will be equal.
++#
++# Information about the commits which are being pushed is supplied as lines to
++# the standard input in the form:
++#
++#   <local ref> <local oid> <remote ref> <remote oid>
++#
++# This sample shows how to prevent push of commits where the log message starts
++# with "WIP" (work in progress).
++
++remote="$1"
++url="$2"
++
++zero=$(git hash-object --stdin </dev/null | tr '[0-9a-f]' '0')
++
++while read local_ref local_oid remote_ref remote_oid
++do
++	if test "$local_oid" = "$zero"
++	then
++		# Handle delete
++		:
++	else
++		if test "$remote_oid" = "$zero"
++		then
++			# New branch, examine all commits
++			range="$local_oid"
++		else
++			# Update to existing branch, examine new commits
++			range="$remote_oid..$local_oid"
++		fi
++
++		# Check for WIP commit
++		commit=$(git rev-list -n 1 --grep '^WIP' "$range")
++		if test -n "$commit"
++		then
++			echo >&2 "Found WIP commit in $local_ref, not pushing"
++			exit 1
++		fi
++	fi
++done
++
++exit 0
+diff -ruN G36/.git/hooks/pre-rebase.sample xv6-public_original/.git/hooks/pre-rebase.sample
+--- G36/.git/hooks/pre-rebase.sample	1970-01-01 05:30:00.000000000 +0530
++++ xv6-public_original/.git/hooks/pre-rebase.sample	2022-08-12 23:03:57.022407387 +0530
+@@ -0,0 +1,169 @@
++#!/bin/sh
++#
++# Copyright (c) 2006, 2008 Junio C Hamano
++#
++# The "pre-rebase" hook is run just before "git rebase" starts doing
++# its job, and can prevent the command from running by exiting with
++# non-zero status.
++#
++# The hook is called with the following parameters:
++#
++# $1 -- the upstream the series was forked from.
++# $2 -- the branch being rebased (or empty when rebasing the current branch).
++#
++# This sample shows how to prevent topic branches that are already
++# merged to 'next' branch from getting rebased, because allowing it
++# would result in rebasing already published history.
++
++publish=next
++basebranch="$1"
++if test "$#" = 2
++then
++	topic="refs/heads/$2"
++else
++	topic=`git symbolic-ref HEAD` ||
++	exit 0 ;# we do not interrupt rebasing detached HEAD
++fi
++
++case "$topic" in
++refs/heads/??/*)
++	;;
++*)
++	exit 0 ;# we do not interrupt others.
++	;;
++esac
++
++# Now we are dealing with a topic branch being rebased
++# on top of master.  Is it OK to rebase it?
++
++# Does the topic really exist?
++git show-ref -q "$topic" || {
++	echo >&2 "No such branch $topic"
++	exit 1
++}
++
++# Is topic fully merged to master?
++not_in_master=`git rev-list --pretty=oneline ^master "$topic"`
++if test -z "$not_in_master"
++then
++	echo >&2 "$topic is fully merged to master; better remove it."
++	exit 1 ;# we could allow it, but there is no point.
++fi
++
++# Is topic ever merged to next?  If so you should not be rebasing it.
++only_next_1=`git rev-list ^master "^$topic" ${publish} | sort`
++only_next_2=`git rev-list ^master           ${publish} | sort`
++if test "$only_next_1" = "$only_next_2"
++then
++	not_in_topic=`git rev-list "^$topic" master`
++	if test -z "$not_in_topic"
++	then
++		echo >&2 "$topic is already up to date with master"
++		exit 1 ;# we could allow it, but there is no point.
++	else
++		exit 0
++	fi
++else
++	not_in_next=`git rev-list --pretty=oneline ^${publish} "$topic"`
++	/usr/bin/perl -e '
++		my $topic = $ARGV[0];
++		my $msg = "* $topic has commits already merged to public branch:\n";
++		my (%not_in_next) = map {
++			/^([0-9a-f]+) /;
++			($1 => 1);
++		} split(/\n/, $ARGV[1]);
++		for my $elem (map {
++				/^([0-9a-f]+) (.*)$/;
++				[$1 => $2];
++			} split(/\n/, $ARGV[2])) {
++			if (!exists $not_in_next{$elem->[0]}) {
++				if ($msg) {
++					print STDERR $msg;
++					undef $msg;
++				}
++				print STDERR " $elem->[1]\n";
++			}
++		}
++	' "$topic" "$not_in_next" "$not_in_master"
++	exit 1
++fi
++
++<<\DOC_END
++
++This sample hook safeguards topic branches that have been
++published from being rewound.
++
++The workflow assumed here is:
++
++ * Once a topic branch forks from "master", "master" is never
++   merged into it again (either directly or indirectly).
++
++ * Once a topic branch is fully cooked and merged into "master",
++   it is deleted.  If you need to build on top of it to correct
++   earlier mistakes, a new topic branch is created by forking at
++   the tip of the "master".  This is not strictly necessary, but
++   it makes it easier to keep your history simple.
++
++ * Whenever you need to test or publish your changes to topic
++   branches, merge them into "next" branch.
++
++The script, being an example, hardcodes the publish branch name
++to be "next", but it is trivial to make it configurable via
++$GIT_DIR/config mechanism.
++
++With this workflow, you would want to know:
++
++(1) ... if a topic branch has ever been merged to "next".  Young
++    topic branches can have stupid mistakes you would rather
++    clean up before publishing, and things that have not been
++    merged into other branches can be easily rebased without
++    affecting other people.  But once it is published, you would
++    not want to rewind it.
++
++(2) ... if a topic branch has been fully merged to "master".
++    Then you can delete it.  More importantly, you should not
++    build on top of it -- other people may already want to
++    change things related to the topic as patches against your
++    "master", so if you need further changes, it is better to
++    fork the topic (perhaps with the same name) afresh from the
++    tip of "master".
++
++Let's look at this example:
++
++		   o---o---o---o---o---o---o---o---o---o "next"
++		  /       /           /           /
++		 /   a---a---b A     /           /
++		/   /               /           /
++	       /   /   c---c---c---c B         /
++	      /   /   /             \         /
++	     /   /   /   b---b C     \       /
++	    /   /   /   /             \     /
++    ---o---o---o---o---o---o---o---o---o---o---o "master"
++
++
++A, B and C are topic branches.
++
++ * A has one fix since it was merged up to "next".
++
++ * B has finished.  It has been fully merged up to "master" and "next",
++   and is ready to be deleted.
++
++ * C has not merged to "next" at all.
++
++We would want to allow C to be rebased, refuse A, and encourage
++B to be deleted.
++
++To compute (1):
++
++	git rev-list ^master ^topic next
++	git rev-list ^master        next
++
++	if these match, topic has not merged in next at all.
++
++To compute (2):
++
++	git rev-list master..topic
++
++	if this is empty, it is fully merged to "master".
++
++DOC_END
+diff -ruN G36/.git/hooks/pre-receive.sample xv6-public_original/.git/hooks/pre-receive.sample
+--- G36/.git/hooks/pre-receive.sample	1970-01-01 05:30:00.000000000 +0530
++++ xv6-public_original/.git/hooks/pre-receive.sample	2022-08-12 23:03:57.022407387 +0530
+@@ -0,0 +1,24 @@
++#!/bin/sh
++#
++# An example hook script to make use of push options.
++# The example simply echoes all push options that start with 'echoback='
++# and rejects all pushes when the "reject" push option is used.
++#
++# To enable this hook, rename this file to "pre-receive".
++
++if test -n "$GIT_PUSH_OPTION_COUNT"
++then
++	i=0
++	while test "$i" -lt "$GIT_PUSH_OPTION_COUNT"
++	do
++		eval "value=\$GIT_PUSH_OPTION_$i"
++		case "$value" in
++		echoback=*)
++			echo "echo from the pre-receive-hook: ${value#*=}" >&2
++			;;
++		reject)
++			exit 1
++		esac
++		i=$((i + 1))
++	done
++fi
+diff -ruN G36/.git/hooks/push-to-checkout.sample xv6-public_original/.git/hooks/push-to-checkout.sample
+--- G36/.git/hooks/push-to-checkout.sample	1970-01-01 05:30:00.000000000 +0530
++++ xv6-public_original/.git/hooks/push-to-checkout.sample	2022-08-12 23:03:57.022407387 +0530
+@@ -0,0 +1,78 @@
++#!/bin/sh
++
++# An example hook script to update a checked-out tree on a git push.
++#
++# This hook is invoked by git-receive-pack(1) when it reacts to git
++# push and updates reference(s) in its repository, and when the push
++# tries to update the branch that is currently checked out and the
++# receive.denyCurrentBranch configuration variable is set to
++# updateInstead.
++#
++# By default, such a push is refused if the working tree and the index
++# of the remote repository has any difference from the currently
++# checked out commit; when both the working tree and the index match
++# the current commit, they are updated to match the newly pushed tip
++# of the branch. This hook is to be used to override the default
++# behaviour; however the code below reimplements the default behaviour
++# as a starting point for convenient modification.
++#
++# The hook receives the commit with which the tip of the current
++# branch is going to be updated:
++commit=$1
++
++# It can exit with a non-zero status to refuse the push (when it does
++# so, it must not modify the index or the working tree).
++die () {
++	echo >&2 "$*"
++	exit 1
++}
++
++# Or it can make any necessary changes to the working tree and to the
++# index to bring them to the desired state when the tip of the current
++# branch is updated to the new commit, and exit with a zero status.
++#
++# For example, the hook can simply run git read-tree -u -m HEAD "$1"
++# in order to emulate git fetch that is run in the reverse direction
++# with git push, as the two-tree form of git read-tree -u -m is
++# essentially the same as git switch or git checkout that switches
++# branches while keeping the local changes in the working tree that do
++# not interfere with the difference between the branches.
++
++# The below is a more-or-less exact translation to shell of the C code
++# for the default behaviour for git's push-to-checkout hook defined in
++# the push_to_deploy() function in builtin/receive-pack.c.
++#
++# Note that the hook will be executed from the repository directory,
++# not from the working tree, so if you want to perform operations on
++# the working tree, you will have to adapt your code accordingly, e.g.
++# by adding "cd .." or using relative paths.
++
++if ! git update-index -q --ignore-submodules --refresh
++then
++	die "Up-to-date check failed"
++fi
++
++if ! git diff-files --quiet --ignore-submodules --
++then
++	die "Working directory has unstaged changes"
++fi
++
++# This is a rough translation of:
++#
++#   head_has_history() ? "HEAD" : EMPTY_TREE_SHA1_HEX
++if git cat-file -e HEAD 2>/dev/null
++then
++	head=HEAD
++else
++	head=$(git hash-object -t tree --stdin </dev/null)
++fi
++
++if ! git diff-index --quiet --cached --ignore-submodules $head --
++then
++	die "Working directory has staged changes"
++fi
++
++if ! git read-tree -u -m "$commit"
++then
++	die "Could not update working tree to new HEAD"
++fi
+diff -ruN G36/.git/hooks/update.sample xv6-public_original/.git/hooks/update.sample
+--- G36/.git/hooks/update.sample	1970-01-01 05:30:00.000000000 +0530
++++ xv6-public_original/.git/hooks/update.sample	2022-08-12 23:03:57.022407387 +0530
+@@ -0,0 +1,128 @@
++#!/bin/sh
++#
++# An example hook script to block unannotated tags from entering.
++# Called by "git receive-pack" with arguments: refname sha1-old sha1-new
++#
++# To enable this hook, rename this file to "update".
++#
++# Config
++# ------
++# hooks.allowunannotated
++#   This boolean sets whether unannotated tags will be allowed into the
++#   repository.  By default they won't be.
++# hooks.allowdeletetag
++#   This boolean sets whether deleting tags will be allowed in the
++#   repository.  By default they won't be.
++# hooks.allowmodifytag
++#   This boolean sets whether a tag may be modified after creation. By default
++#   it won't be.
++# hooks.allowdeletebranch
++#   This boolean sets whether deleting branches will be allowed in the
++#   repository.  By default they won't be.
++# hooks.denycreatebranch
++#   This boolean sets whether remotely creating branches will be denied
++#   in the repository.  By default this is allowed.
++#
++
++# --- Command line
++refname="$1"
++oldrev="$2"
++newrev="$3"
++
++# --- Safety check
++if [ -z "$GIT_DIR" ]; then
++	echo "Don't run this script from the command line." >&2
++	echo " (if you want, you could supply GIT_DIR then run" >&2
++	echo "  $0 <ref> <oldrev> <newrev>)" >&2
++	exit 1
++fi
++
++if [ -z "$refname" -o -z "$oldrev" -o -z "$newrev" ]; then
++	echo "usage: $0 <ref> <oldrev> <newrev>" >&2
++	exit 1
++fi
++
++# --- Config
++allowunannotated=$(git config --type=bool hooks.allowunannotated)
++allowdeletebranch=$(git config --type=bool hooks.allowdeletebranch)
++denycreatebranch=$(git config --type=bool hooks.denycreatebranch)
++allowdeletetag=$(git config --type=bool hooks.allowdeletetag)
++allowmodifytag=$(git config --type=bool hooks.allowmodifytag)
++
++# check for no description
++projectdesc=$(sed -e '1q' "$GIT_DIR/description")
++case "$projectdesc" in
++"Unnamed repository"* | "")
++	echo "*** Project description file hasn't been set" >&2
++	exit 1
++	;;
++esac
++
++# --- Check types
++# if $newrev is 0000...0000, it's a commit to delete a ref.
++zero=$(git hash-object --stdin </dev/null | tr '[0-9a-f]' '0')
++if [ "$newrev" = "$zero" ]; then
++	newrev_type=delete
++else
++	newrev_type=$(git cat-file -t $newrev)
++fi
++
++case "$refname","$newrev_type" in
++	refs/tags/*,commit)
++		# un-annotated tag
++		short_refname=${refname##refs/tags/}
++		if [ "$allowunannotated" != "true" ]; then
++			echo "*** The un-annotated tag, $short_refname, is not allowed in this repository" >&2
++			echo "*** Use 'git tag [ -a | -s ]' for tags you want to propagate." >&2
++			exit 1
++		fi
++		;;
++	refs/tags/*,delete)
++		# delete tag
++		if [ "$allowdeletetag" != "true" ]; then
++			echo "*** Deleting a tag is not allowed in this repository" >&2
++			exit 1
++		fi
++		;;
++	refs/tags/*,tag)
++		# annotated tag
++		if [ "$allowmodifytag" != "true" ] && git rev-parse $refname > /dev/null 2>&1
++		then
++			echo "*** Tag '$refname' already exists." >&2
++			echo "*** Modifying a tag is not allowed in this repository." >&2
++			exit 1
++		fi
++		;;
++	refs/heads/*,commit)
++		# branch
++		if [ "$oldrev" = "$zero" -a "$denycreatebranch" = "true" ]; then
++			echo "*** Creating a branch is not allowed in this repository" >&2
++			exit 1
++		fi
++		;;
++	refs/heads/*,delete)
++		# delete branch
++		if [ "$allowdeletebranch" != "true" ]; then
++			echo "*** Deleting a branch is not allowed in this repository" >&2
++			exit 1
++		fi
++		;;
++	refs/remotes/*,commit)
++		# tracking branch
++		;;
++	refs/remotes/*,delete)
++		# delete tracking branch
++		if [ "$allowdeletebranch" != "true" ]; then
++			echo "*** Deleting a tracking branch is not allowed in this repository" >&2
++			exit 1
++		fi
++		;;
++	*)
++		# Anything else (is there anything else?)
++		echo "*** Update hook: unknown type of update to ref $refname of type $newrev_type" >&2
++		exit 1
++		;;
++esac
++
++# --- Finished
++exit 0
+Binary files G36/.git/index and xv6-public_original/.git/index differ
+diff -ruN G36/.git/info/exclude xv6-public_original/.git/info/exclude
+--- G36/.git/info/exclude	1970-01-01 05:30:00.000000000 +0530
++++ xv6-public_original/.git/info/exclude	2022-08-12 23:03:57.022407387 +0530
+@@ -0,0 +1,6 @@
++# git ls-files --others --exclude-from=.git/info/exclude
++# Lines that start with '#' are comments.
++# For a project mostly in C, the following would be a good set of
++# exclude patterns (uncomment them if you want to use them):
++# *.[oa]
++# *~
+diff -ruN G36/.git/logs/HEAD xv6-public_original/.git/logs/HEAD
+--- G36/.git/logs/HEAD	1970-01-01 05:30:00.000000000 +0530
++++ xv6-public_original/.git/logs/HEAD	2022-08-12 23:04:14.366780881 +0530
+@@ -0,0 +1 @@
++0000000000000000000000000000000000000000 eeb7b415dbcb12cc362d0783e41c3d1f44066b17 Pranshu Shah <shahpranshu12@gmail.com> 1660325654 +0530	clone: from https://github.com/mit-pdos/xv6-public.git
+diff -ruN G36/.git/logs/refs/heads/master xv6-public_original/.git/logs/refs/heads/master
+--- G36/.git/logs/refs/heads/master	1970-01-01 05:30:00.000000000 +0530
++++ xv6-public_original/.git/logs/refs/heads/master	2022-08-12 23:04:14.366780881 +0530
+@@ -0,0 +1 @@
++0000000000000000000000000000000000000000 eeb7b415dbcb12cc362d0783e41c3d1f44066b17 Pranshu Shah <shahpranshu12@gmail.com> 1660325654 +0530	clone: from https://github.com/mit-pdos/xv6-public.git
+diff -ruN G36/.git/logs/refs/remotes/origin/HEAD xv6-public_original/.git/logs/refs/remotes/origin/HEAD
+--- G36/.git/logs/refs/remotes/origin/HEAD	1970-01-01 05:30:00.000000000 +0530
++++ xv6-public_original/.git/logs/refs/remotes/origin/HEAD	2022-08-12 23:04:14.366780881 +0530
+@@ -0,0 +1 @@
++0000000000000000000000000000000000000000 eeb7b415dbcb12cc362d0783e41c3d1f44066b17 Pranshu Shah <shahpranshu12@gmail.com> 1660325654 +0530	clone: from https://github.com/mit-pdos/xv6-public.git
+Binary files G36/.git/objects/pack/pack-df231414196a28fc988083de319039681dd68d80.idx and xv6-public_original/.git/objects/pack/pack-df231414196a28fc988083de319039681dd68d80.idx differ
+Binary files G36/.git/objects/pack/pack-df231414196a28fc988083de319039681dd68d80.pack and xv6-public_original/.git/objects/pack/pack-df231414196a28fc988083de319039681dd68d80.pack differ
+diff -ruN G36/.git/packed-refs xv6-public_original/.git/packed-refs
+--- G36/.git/packed-refs	1970-01-01 05:30:00.000000000 +0530
++++ xv6-public_original/.git/packed-refs	2022-08-12 23:04:14.366780881 +0530
+@@ -0,0 +1,28 @@
++# pack-refs with: peeled fully-peeled sorted 
++eeb7b415dbcb12cc362d0783e41c3d1f44066b17 refs/remotes/origin/master
++af0e851a3a8a7d13bc2f2d596b58500594040892 refs/tags/osdi12-submit
++^8286b58087750e09bac3815219e0382a0bb2b159
++9e698c587b135db17b38a5838976805b9c01e338 refs/tags/symlinks
++05e0b1218dcebe1f40028531b51926df8ae52be0 refs/tags/xv6-2006
++^5cc0bd5ceaf805ab44f851e6a3f1952a29e9d7b7
++42f3c3f7be9717b66ba6e133a113c0f751c53133 refs/tags/xv6-2007
++adcd16c3f7588b4a28d37495f05e94278c9e3a1e refs/tags/xv6-2008
++124fe7e457c0dc9b671c7ffccb56004eb61da4f0 refs/tags/xv6-2010
++5922cdbbcc4fdbd76eec9e0dad9f650e4c86ee99 refs/tags/xv6-rev0
++^5cc0bd5ceaf805ab44f851e6a3f1952a29e9d7b7
++81f31a773dd49b001437eaed3975438585ff9911 refs/tags/xv6-rev1
++^42f3c3f7be9717b66ba6e133a113c0f751c53133
++b818915f793cd20c5d1e24f668534a9d690f3cc8 refs/tags/xv6-rev11
++30dab73b68b816877dc8f78504ceca0808c976eb refs/tags/xv6-rev3
++^074ac7ccd43c08d01a237ce6f14cac10715a51ef
++113005d48f09a4e3939940d72a77bf6973ea8755 refs/tags/xv6-rev4
++^124fe7e457c0dc9b671c7ffccb56004eb61da4f0
++d6aa754494b37e32862b1f78d53deedc53f66a15 refs/tags/xv6-rev5
++^ae603ff5e79bb7b5eea4147425752f33d29fe558
++3e9d6413d331b4c912d55bfac253af1629d4bac9 refs/tags/xv6-rev6
++^e64c661ae8b91bd7e858bb1895bef96e6ac2b4bb
++ccc25c0fac59067d88af52ad9f3b8cee97c3810a refs/tags/xv6-rev7
++^2ae8392a5c203a7b1bc5b8bff5eabc8b5eab8972
++7d6f95e327f1c18570d5dd187e3d92e1aadae2cf refs/tags/xv6-rev8
++^9ba21267e796eb462a657392906e3cbccaedcc99
++5bf3fbee00fb27cb8cb4eca72dcd9fc4c288ed71 refs/tags/xv6-rev9
+diff -ruN G36/.git/refs/heads/master xv6-public_original/.git/refs/heads/master
+--- G36/.git/refs/heads/master	1970-01-01 05:30:00.000000000 +0530
++++ xv6-public_original/.git/refs/heads/master	2022-08-12 23:04:14.366780881 +0530
+@@ -0,0 +1 @@
++eeb7b415dbcb12cc362d0783e41c3d1f44066b17
+diff -ruN G36/.git/refs/remotes/origin/HEAD xv6-public_original/.git/refs/remotes/origin/HEAD
+--- G36/.git/refs/remotes/origin/HEAD	1970-01-01 05:30:00.000000000 +0530
++++ xv6-public_original/.git/refs/remotes/origin/HEAD	2022-08-12 23:04:14.366780881 +0530
+@@ -0,0 +1 @@
++ref: refs/remotes/origin/master
+diff -ruN G36/.gitignore xv6-public_original/.gitignore
+--- G36/.gitignore	1970-01-01 05:30:00.000000000 +0530
++++ xv6-public_original/.gitignore	2022-08-12 23:04:14.366780881 +0530
+@@ -0,0 +1,16 @@
++*~
++_*
++*.o
++*.d
++*.asm
++*.sym
++*.img
++vectors.S
++bootblock
++entryother
++initcode
++initcode.out
++kernel
++kernelmemfs
++mkfs
++.gdbinit
+diff -ruN G36/Makefile xv6-public_original/Makefile
+--- G36/Makefile	2022-10-07 20:24:55.000000000 +0530
++++ xv6-public_original/Makefile	2022-08-12 23:04:14.366780881 +0530
+@@ -181,13 +181,6 @@
+ 	_usertests\
+ 	_wc\
+ 	_zombie\
+-	_getNumProc\
+-	_getMaxPid\
+-	_getProcInfo\
+-	_setBurstTime\
+-	_test_1\
+-	_test_2\
+-	_test_3\
+ 
+ fs.img: mkfs README $(UPROGS)
+ 	./mkfs fs.img README $(UPROGS)
+diff -ruN G36/param.h xv6-public_original/param.h
+--- G36/param.h	2022-10-07 02:22:17.000000000 +0530
++++ xv6-public_original/param.h	2022-08-12 23:04:14.370780968 +0530
+@@ -1,6 +1,6 @@
+ #define NPROC        64  // maximum number of processes
+ #define KSTACKSIZE 4096  // size of per-process kernel stack
+-#define NCPU          1  // maximum number of CPUs
++#define NCPU          8  // maximum number of CPUs
+ #define NOFILE       16  // open files per process
+ #define NFILE       100  // open files per system
+ #define NINODE       50  // maximum number of active i-nodes
+diff -ruN G36/proc.c xv6-public_original/proc.c
+--- G36/proc.c	2022-10-07 19:13:25.000000000 +0530
++++ xv6-public_original/proc.c	2022-08-12 23:04:14.370780968 +0530
+@@ -6,28 +6,15 @@
+ #include "x86.h"
+ #include "proc.h"
+ #include "spinlock.h"
+-#include "processInfo.h"
+ 
+ struct {
+   struct spinlock lock;
+   struct proc proc[NPROC];
+ } ptable;
+ 
+-struct {
+-  struct spinlock lock;
+-  MinHeap minheap;
+-} heap;
+-
+-struct {
+-  struct spinlock lock;
+-  MinHeap minheap;
+-} compheap;
+-
+-
+ static struct proc *initproc;
+ 
+ int nextpid = 1;
+-int quanta=0;
+ extern void forkret(void);
+ extern void trapret(void);
+ 
+@@ -37,8 +24,6 @@
+ pinit(void)
+ {
+   initlock(&ptable.lock, "ptable");
+-  initlock(&heap.lock, "minheap");
+-  initlock(&compheap.lock, "compminheap");
+ }
+ 
+ // Must be called with interrupts disabled
+@@ -47,186 +32,6 @@
+   return mycpu()-cpus;
+ }
+ 
+-
+-
+-
+-
+-
+-
+-int parent(int i) {
+-    // Get the index of the parent
+-    return (i - 1) / 2;
+-}
+-
+-int left_child(int i) {
+-    return (2*i + 1);
+-}
+-
+-int right_child(int i) {
+-    return (2*i + 2);
+-}
+-
+-int get_min(MinHeap* heap) {
+-    // Return the root node element,
+-    // since that's the minimum
+-    return heap->arr[0]->burst_time;
+-}
+-
+-MinHeap* insert_minheap(MinHeap* heap,struct proc* element) {
+-    // Inserts an element to the min heap
+-    // We first add it to the bottom (last level)
+-    // of the tree, and keep swapping with it's parent
+-    // if it is lesser than it. We keep doing that until
+-    // we reach the root node. So, we will have inserted the
+-    // element in it's proper position to preserve the min heap property
+-    if (heap->size == 64) {
+-        cprintf("Cannot insert %d. Heap is already full!\n", element);
+-        return heap;
+-    }
+-    // We can add it. Increase the size and add it to the end
+-    heap->size++;
+-    heap->arr[heap->size - 1] = element;
+-
+-    // Keep swapping until we reach the root
+-    int curr = heap->size - 1;
+-    // As long as you aren't in the root node, and while the 
+-    // parent of the last element is greater than it
+-    while (curr > 0 && heap->arr[parent(curr)]->burst_time > heap->arr[curr]->burst_time) {
+-        // Swap
+-        struct proc* temp = heap->arr[parent(curr)];
+-        heap->arr[parent(curr)] = heap->arr[curr];
+-        heap->arr[curr] = temp;
+-        // Update the current index of element
+-        curr = parent(curr);
+-    }
+-    return heap; 
+-}
+-
+-MinHeap* heapify(MinHeap* heap, int index) {
+-    // Rearranges the heap as to maintain
+-    // the min-heap property
+-    if (heap->size <= 1)
+-        return heap;
+-    
+-    int left = left_child(index); 
+-    int right = right_child(index); 
+-
+-    // Variable to get the smallest element of the subtree
+-    // of an element an index
+-    int smallest = index; 
+-    
+-    // If the left child is smaller than this element, it is
+-    // the smallest
+-    if (left < heap->size && heap->arr[left]->burst_time < heap->arr[index]->burst_time) 
+-        smallest = left; 
+-    
+-    // Similarly for the right, but we are updating the smallest element
+-    // so that it will definitely give the least element of the subtree
+-    if (right < heap->size && heap->arr[right]->burst_time < heap->arr[smallest]->burst_time) 
+-        smallest = right; 
+-
+-    // Now if the current element is not the smallest,
+-    // swap with the current element. The min heap property
+-    // is now satisfied for this subtree. We now need to
+-    // recursively keep doing this until we reach the root node,
+-    // the point at which there will be no change!
+-    if (smallest != index) 
+-    { 
+-        struct proc* temp = heap->arr[index];
+-        heap->arr[index] = heap->arr[smallest];
+-        heap->arr[smallest] = temp;
+-        heap = heapify(heap, smallest); 
+-    }
+-
+-    return heap;
+-}
+-
+-MinHeap* delete_minimum(MinHeap* heap) {
+-    // Deletes the minimum element, at the root
+-    if (!heap || heap->size == 0)
+-        return heap;
+-
+-    int size = heap->size;
+-    struct proc* last_element = heap->arr[size-1];
+-    
+-    // Update root value with the last element
+-    heap->arr[0] = last_element;
+-
+-    // Now remove the last element, by decreasing the size
+-    heap->size--;
+-    size--;
+-
+-    // We need to call heapify(), to maintain the min-heap
+-    // property
+-    heap = heapify(heap, 0);
+-    return heap;
+-}
+-
+-MinHeap* delete_element(MinHeap* heap, int index) {
+-    // Deletes an element, indexed by index
+-    // Ensure that it's lesser than the current root
+-
+-    // while(get_min(heap)==0)   // changed before lunch
+-    //   yield();
+-    int x = heap->arr[index]->burst_time;
+-    heap->arr[index]->burst_time = get_min(heap) - 1;
+-    
+-    // Now keep swapping, until we update the tree
+-    int curr = index;
+-    while (curr > 0 && heap->arr[parent(curr)]->burst_time > heap->arr[curr]->burst_time) {
+-        struct proc* temp = heap->arr[parent(curr)];
+-        heap->arr[parent(curr)] = heap->arr[curr];
+-        heap->arr[curr] = temp;
+-        curr = parent(curr);
+-    }
+-
+-    // Now simply delete the minimum element
+-    heap->arr[0]->burst_time = x;
+-    heap = delete_minimum(heap);
+-    return heap;
+-}
+-
+-void print_heap(MinHeap* curr) {
+-    // Simply print the array. This is an
+-    // inorder traversal of the tree
+-    cprintf("Min Heap:\n");
+-    for (int i=0; i<curr->size; i++) {
+-        cprintf("pid:%d burst time:%d time quanta:%d time elapsed:%d\n", curr->arr[i]->pid,curr->arr[i]->burst_time,curr->arr[i]->time_quanta,curr->arr[i]->time_elapsed);
+-    }
+-    cprintf("\n");
+-}
+-
+-int IsEmpty(MinHeap *heap)
+-{
+-    if(heap->size==0)
+-        return 0;
+-    return -1;
+-}
+-
+-int IsFull(MinHeap *heap)
+-{
+-    if(heap->size == 64)
+-        return 0;
+-    return -1;
+-}
+-
+-void addTocurrRQ(struct proc* p)
+-{
+-  acquire(&heap.lock);
+-    insert_minheap((MinHeap *)&heap.minheap,p);
+-  //   // cprintf("adding new processes %d\n",heap.minheap.size);
+-  release(&heap.lock);
+-}
+-
+-
+-void addTocompRQ(struct proc* p)
+-{
+-  acquire(&compheap.lock);
+-    insert_minheap((MinHeap *)&compheap.minheap,p);
+-  //   // cprintf("adding new processes %d\n",heap.minheap.size);
+-  release(&compheap.lock);
+-}
+-
+ // Must be called with interrupts disabled to avoid the caller being
+ // rescheduled between reading lapicid and running through the loop.
+ struct cpu*
+@@ -283,11 +88,6 @@
+ found:
+   p->state = EMBRYO;
+   p->pid = nextpid++;
+-  p->contextswitches = 0;
+-  p->burst_time = 0;
+-  p->time_elapsed = 0;
+-  p->time_quanta = 0;
+-
+ 
+   release(&ptable.lock);
+ 
+@@ -349,7 +149,6 @@
+   acquire(&ptable.lock);
+ 
+   p->state = RUNNABLE;
+-  addTocurrRQ(p);
+ 
+   release(&ptable.lock);
+ }
+@@ -416,7 +215,6 @@
+   acquire(&ptable.lock);
+ 
+   np->state = RUNNABLE;
+-  addTocurrRQ(np);
+ 
+   release(&ptable.lock);
+ 
+@@ -513,8 +311,6 @@
+   }
+ }
+ 
+-// original scheduler
+-
+ //PAGEBREAK: 42
+ // Per-CPU process scheduler.
+ // Each CPU calls scheduler() after setting itself up.
+@@ -523,44 +319,6 @@
+ //  - swtch to start running that process
+ //  - eventually that process transfers control
+ //      via swtch back to the scheduler.
+-// void
+-// scheduler(void)
+-// {
+-//   struct proc *p;
+-//   struct cpu *c = mycpu();
+-//   c->proc = 0;
+-  
+-//   for(;;){
+-//     // Enable interrupts on this processor.
+-//     sti();
+-
+-//     // Loop over process table looking for process to run.
+-//     acquire(&ptable.lock);
+-//     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+-//       if(p->state != RUNNABLE)
+-//         continue;
+-
+-//       // Switch to chosen process.  It is the process's job
+-//       // to release ptable.lock and then reacquire it
+-//       // before jumping back to us.
+-//       c->proc = p;
+-//       switchuvm(p);
+-//       p->state = RUNNING;
+-
+-//       swtch(&(c->scheduler), p->context);
+-//       p->contextswitches = p->contextswitches + 1;
+-//       switchkvm();
+-
+-//       // Process is done running for now.
+-//       // It should have changed its p->state before coming back.
+-//       c->proc = 0;
+-//     }
+-//     release(&ptable.lock);
+-
+-//   }
+-// }
+-
+-// our scheduler
+ void
+ scheduler(void)
+ {
+@@ -571,31 +329,21 @@
+   for(;;){
+     // Enable interrupts on this processor.
+     sti();
+-    
+-		acquire(&ptable.lock);
+-		// To store the job with least burst time
+-    struct proc *shortest_job = 0;
+-
+-		// Find the job with least burst time
+-    if(heap.minheap.size>0)
+-      shortest_job = heap.minheap.arr[0];
+-    
+-    if (shortest_job)
+-    {
+-      p = shortest_job;
+-      //cprintf("BT%d \n", p->burst);
++
++    // Loop over process table looking for process to run.
++    acquire(&ptable.lock);
++    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
++      if(p->state != RUNNABLE)
++        continue;
++
+       // Switch to chosen process.  It is the process's job
+       // to release ptable.lock and then reacquire it
+       // before jumping back to us.
+       c->proc = p;
+-      p->time_quanta=quanta;
+       switchuvm(p);
+       p->state = RUNNING;
+ 
+       swtch(&(c->scheduler), p->context);
+-      
+-      // increment number of context switches
+-      p->contextswitches = p->contextswitches + 1;
+       switchkvm();
+ 
+       // Process is done running for now.
+@@ -604,19 +352,9 @@
+     }
+     release(&ptable.lock);
+ 
+-    acquire(&heap.lock);
+-    acquire(&compheap.lock);
+-    if(heap.minheap.size==0)
+-    {
+-      heap.minheap = compheap.minheap;
+-      compheap.minheap.size = 0;
+-    }
+-    release(&compheap.lock);
+-    release(&heap.lock);
+   }
+ }
+ 
+-
+ // Enter scheduler.  Must hold only ptable.lock
+ // and have changed proc->state. Saves and restores
+ // intena because intena is a property of this
+@@ -639,23 +377,6 @@
+   if(readeflags()&FL_IF)
+     panic("sched interruptible");
+   intena = mycpu()->intena;
+-
+-// check state before exitting
+-  // if(p->state == ZOMBIE)
+-  // {
+-    acquire(&heap.lock);
+-    int index = -1;
+-    for(index=0;index<heap.minheap.size;index++)
+-    {
+-      if(heap.minheap.arr[index]==p)
+-      {
+-        delete_element(&heap.minheap,index);
+-        break;
+-      }
+-    }
+-    release(&heap.lock);
+-  // }
+-
+   swtch(&p->context, mycpu()->scheduler);
+   mycpu()->intena = intena;
+ }
+@@ -666,7 +387,6 @@
+ {
+   acquire(&ptable.lock);  //DOC: yieldlock
+   myproc()->state = RUNNABLE;
+-  addTocompRQ(myproc());
+   sched();
+   release(&ptable.lock);
+ }
+@@ -741,10 +461,7 @@
+ 
+   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+     if(p->state == SLEEPING && p->chan == chan)
+-    {
+       p->state = RUNNABLE;
+-      addTocurrRQ(p);
+-    }
+ }
+ 
+ // Wake up all processes sleeping on chan.
+@@ -770,10 +487,7 @@
+       p->killed = 1;
+       // Wake process from sleep if necessary.
+       if(p->state == SLEEPING)
+-      {
+         p->state = RUNNABLE;
+-        addTocurrRQ(p);
+-      }
+       release(&ptable.lock);
+       return 0;
+     }
+@@ -818,128 +532,3 @@
+     cprintf("\n");
+   }
+ }
+-
+-int getNumProc(void)
+-{
+-  char *states[] = {"unused","embryo","sleep ","runnable",
+-                      "running","zombie"};
+-	struct proc *p;
+-
+-	int count = 0;
+-  acquire(&ptable.lock);
+-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+-    if(p->state != UNUSED)
+-    {
+-    	count++;
+-      cprintf("pid:%d state: %s\n",p->pid,states[p->state]);
+-    }
+-  }
+-  release(&ptable.lock);
+-  return count;
+-}
+-
+-int getMaxPid(void)
+-{
+-	struct proc *p;
+-
+-	int max = -1;
+-  int tmp = 1;
+-  acquire(&ptable.lock);
+-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+-    // if(p->pid!=0)
+-    //   cprintf("%d: pid:%d\n",tmp, p->pid);
+-    tmp++;
+-    if(p->state != UNUSED)
+-    {
+-    	if(p->pid > max)
+-      max = p->pid;
+-    }
+-  }
+-  release(&ptable.lock);
+-  return max;
+-}
+-
+-int getProcInfo(int pid, struct processInfo* st)
+-{
+-  char *states[] = {"unused","embryo","sleep ","runnable",
+-                      "running","zombie"};
+-
+-	struct proc *p;
+-	int flag = -1;
+-  int tmp=0;
+-  int i=0;
+-  int j=0;
+-  acquire(&ptable.lock);
+-  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+-    // cprintf("%d pid:%d bt:%d\n",tmp, p->pid,p->burst_time);
+-    tmp++;
+-    if(p->pid == pid)
+-    {
+-    	st->ppid = 0;
+-    	// check if parent exists
+-      if(p->parent != 0)
+-      { 
+-          st->ppid = p->parent->pid; 
+-      }
+-
+-      //copying the properties
+-      st->psize = p->sz;
+-      st->numberContextSwitches = p->contextswitches;
+-      for(i=0;i<16;i++)
+-        st->name[i] = p->name[i];
+-      
+-      for(i=0;i<6;i++)
+-      {
+-        if(p->state == i)
+-        {
+-          for(j=0;j<7;j++)
+-            st->state[j]=states[i][j];
+-          // cprintf("hello %c\n",states[1][1]);
+-          break;
+-        }
+-      }
+-
+-      st->killed = p->killed;
+-      st->burst_time = p->burst_time;
+-			flag = 0;
+-      break;
+-    }
+-    // if(tmp>17)
+-    // 	break;
+-  }
+-  // print_heap((MinHeap *)&heap.minheap);
+-  release(&ptable.lock);
+-  return flag;
+-}
+-
+-// does ptable changes affect below functions, imo no
+-
+-int setBurstTime(int n)
+-{
+-  acquire(&ptable.lock);
+-  struct proc *curproc = myproc();
+-
+-  curproc->burst_time=n;
+-
+-  // struct proc *edittedproc = myproc();
+-  // cprintf("burst time set to %d\n",edittedproc->burst_time);
+-  
+-  if(quanta==0 && n!=0)
+-    quanta=n;
+-  if(quanta>0 && n!=0 && n<quanta)
+-    quanta=n;
+-
+-  release(&ptable.lock);
+-  yield();
+-  return 0;
+-}
+-
+-int getBurstTime()
+-{
+-  acquire(&ptable.lock);
+-  struct proc *curproc = myproc();
+-  int burst_time=curproc->burst_time;
+-  release(&ptable.lock);
+-  return burst_time;
+-}
+-
+diff -ruN G36/processInfo.h xv6-public_original/processInfo.h
+--- G36/processInfo.h	2022-10-05 17:29:56.000000000 +0530
++++ xv6-public_original/processInfo.h	1970-01-01 05:30:00.000000000 +0530
+@@ -1,10 +0,0 @@
+-struct processInfo
+-{
+-    int ppid;
+-    int psize;
+-    int numberContextSwitches;
+-    int burst_time;
+-    char name[16];
+-    char state[7];
+-    int killed; 
+-};
+diff -ruN G36/proc.h xv6-public_original/proc.h
+--- G36/proc.h	2022-10-07 16:55:19.000000000 +0530
++++ xv6-public_original/proc.h	2022-08-12 23:04:14.370780968 +0530
+@@ -1,13 +1,3 @@
+-typedef struct MinHeap MinHeap;
+-
+-struct MinHeap {
+-    struct proc* arr[64];
+-    // Current Size of the Heap
+-    int size;
+-    // Maximum capacity of the heap
+-    //int capacity;
+-};
+-
+ // Per-CPU state
+ struct cpu {
+   uchar apicid;                // Local APIC ID
+@@ -59,10 +49,6 @@
+   struct file *ofile[NOFILE];  // Open files
+   struct inode *cwd;           // Current directory
+   char name[16];               // Process name (debugging)
+-  int contextswitches;         // to store number of context switches
+-  int burst_time;               // to store number of cpu burst time	
+-  int time_quanta;
+-  int time_elapsed;
+ };
+ 
+ // Process memory is laid out contiguously, low addresses first:
+diff -ruN G36/setBurstTime.c xv6-public_original/setBurstTime.c
+--- G36/setBurstTime.c	2022-10-07 19:11:53.000000000 +0530
++++ xv6-public_original/setBurstTime.c	1970-01-01 05:30:00.000000000 +0530
+@@ -1,21 +0,0 @@
+-#include "types.h"
+-#include "stat.h"
+-#include "user.h"
+-
+-int main(int argc, char *argv[])
+-{
+-	if(argc < 2)
+-    {
+-		printf(2, "Usage: getProcInfo...\n");
+-		exit();
+-	}
+-
+-    if(setBurstTime(atoi(argv[1]))<0)
+-    {
+-        printf(2, "Setting burst time failed\n");
+-		exit();
+-    }
+-
+-    // printf(1,"Burst time set to %d\n",getBurstTime());
+-    exit();
+-}
+\ No newline at end of file
+diff -ruN G36/syscall.c xv6-public_original/syscall.c
+--- G36/syscall.c	2022-10-04 18:39:43.000000000 +0530
++++ xv6-public_original/syscall.c	2022-08-12 23:04:14.370780968 +0530
+@@ -103,11 +103,6 @@
+ extern int sys_wait(void);
+ extern int sys_write(void);
+ extern int sys_uptime(void);
+-extern int sys_getNumProc(void);
+-extern int sys_getMaxPid(void);
+-extern int sys_getProcInfo(void);
+-extern int sys_setBurstTime(void);
+-extern int sys_getBurstTime(void);
+ 
+ static int (*syscalls[])(void) = {
+ [SYS_fork]    sys_fork,
+@@ -131,11 +126,6 @@
+ [SYS_link]    sys_link,
+ [SYS_mkdir]   sys_mkdir,
+ [SYS_close]   sys_close,
+-[SYS_getNumProc]   sys_getNumProc,
+-[SYS_getMaxPid]   sys_getMaxPid,
+-[SYS_getProcInfo]   sys_getProcInfo,
+-[SYS_setBurstTime] sys_setBurstTime,
+-[SYS_getBurstTime] sys_getBurstTime
+ };
+ 
+ void
+diff -ruN G36/syscall.h xv6-public_original/syscall.h
+--- G36/syscall.h	2022-10-04 18:40:46.000000000 +0530
++++ xv6-public_original/syscall.h	2022-08-12 23:04:14.370780968 +0530
+@@ -1,27 +1,22 @@
+ // System call numbers
+-#define SYS_fork            1
+-#define SYS_exit            2
+-#define SYS_wait            3
+-#define SYS_pipe            4
+-#define SYS_read            5
+-#define SYS_kill            6
+-#define SYS_exec            7
+-#define SYS_fstat           8
+-#define SYS_chdir           9
+-#define SYS_dup             10
+-#define SYS_getpid          11
+-#define SYS_sbrk            12
+-#define SYS_sleep           13
+-#define SYS_uptime          14
+-#define SYS_open            15
+-#define SYS_write           16
+-#define SYS_mknod           17
+-#define SYS_unlink          18
+-#define SYS_link            19
+-#define SYS_mkdir           20
+-#define SYS_close           21
+-#define SYS_getNumProc      22
+-#define SYS_getMaxPid       23
+-#define SYS_getProcInfo     24
+-#define SYS_setBurstTime    25
+-#define SYS_getBurstTime    26
+\ No newline at end of file
++#define SYS_fork    1
++#define SYS_exit    2
++#define SYS_wait    3
++#define SYS_pipe    4
++#define SYS_read    5
++#define SYS_kill    6
++#define SYS_exec    7
++#define SYS_fstat   8
++#define SYS_chdir   9
++#define SYS_dup    10
++#define SYS_getpid 11
++#define SYS_sbrk   12
++#define SYS_sleep  13
++#define SYS_uptime 14
++#define SYS_open   15
++#define SYS_write  16
++#define SYS_mknod  17
++#define SYS_unlink 18
++#define SYS_link   19
++#define SYS_mkdir  20
++#define SYS_close  21
+diff -ruN G36/sysproc.c xv6-public_original/sysproc.c
+--- G36/sysproc.c	2022-10-07 10:37:17.000000000 +0530
++++ xv6-public_original/sysproc.c	2022-08-12 23:04:14.370780968 +0530
+@@ -6,13 +6,6 @@
+ #include "memlayout.h"
+ #include "mmu.h"
+ #include "proc.h"
+-#include "processInfo.h"
+-#include "spinlock.h"
+-
+-// struct {
+-//   struct spinlock lock;
+-//   struct proc proc[NPROC];
+-// } ptable;
+ 
+ int
+ sys_fork(void)
+@@ -96,52 +89,3 @@
+   release(&tickslock);
+   return xticks;
+ }
+-
+-int sys_getNumProc(void)
+-{
+-	return getNumProc();
+-}
+-
+-int sys_getMaxPid(void)
+-{
+-  return getMaxPid();
+-}
+-
+-int sys_getProcInfo(void)
+-{
+-	int pid;
+-	struct processInfo* st;
+-	
+-
+-  // fetches pid,st from the user program stack input arguments to give to system calls, 
+-  // stack diagram from top to bottom
+-  // ...
+-  // arg 2
+-  // arg 1
+-  // program_counter  <-- esp(extended stack pointer)
+-  // ...
+-  
+-	if(argint(0, &pid) < 0)
+-    return -1;
+-
+-
+-  if(argptr(1, (void*)&st, sizeof(st)) < 0)
+-    return -1;
+-
+-  return getProcInfo(pid, st);
+-}
+-
+-int sys_setBurstTime(void)
+-{
+-  int burst_duration;
+-
+-  if(argint(0,&burst_duration) < 0)
+-    return -1;
+-  
+-  return setBurstTime(burst_duration);
+-}
+-
+-int sys_getBurstTime(void)
+-{
+-  return getBurstTime();
+-}
+diff -ruN G36/test_1.c xv6-public_original/test_1.c
+--- G36/test_1.c	2022-10-07 23:29:21.544605325 +0530
++++ xv6-public_original/test_1.c	1970-01-01 05:30:00.000000000 +0530
+@@ -1,65 +0,0 @@
+-#include "types.h"
+-#include "stat.h"
+-#include "user.h"
+-
+-#include "processInfo.h"
+-int main()
+-{	
+-	// array containing burst times
+-	int t[10] = {40, 70, 10, 90, 60, 30, 20, 80, 100, 50};
+-	long x = 0;
+-	// setBurstTime(1);
+-	
+-	for(int i=0; i<10; i++)
+-	{
+-		int id = fork();
+-		if(id == 0)
+-		{
+-			x = setBurstTime(t[i]);
+-			
+-			
+-			if(x < 0)
+-			{
+-				printf(1, "Couldn't set burst time for process %d\n", getpid());
+-			}
+-			
+-			// CPU bound process
+-			if(i%2 == 0)
+-			{
+-				double y = 0;
+-				
+-				// code to add delay
+-				for(int i2=0; i2<t[i]*1000000/2; i2++)
+-				{
+-					y += 2.69*13.01;
+-				}
+-				x = y;
+-				
+-				printf(1, "CPU Bound(%d) / ",  x);
+-			}
+-			
+-			// IO bound process
+-			else
+-			{
+-				// mimicking IO wait
+-				for(int i2=0; i2<t[i]*10; i2++)
+-				{
+-					sleep(1);
+-				}
+-				printf(1, "IO Bound / ");
+-			}
+-			
+-			x = getBurstTime();
+-			struct processInfo *info;
+-			info = (struct processInfo*) malloc(sizeof(struct processInfo));
+-			getProcInfo(getpid(), info);
+-			printf(1, "PID: %d Burst Time: %d Context Switches: %d\n",getpid(), x, info->numberContextSwitches);
+-			exit();
+-						
+-		}
+-		
+-	}
+-	
+-	while(wait() != -1);
+-	exit();
+-}
+\ No newline at end of file
+diff -ruN G36/test_2.c xv6-public_original/test_2.c
+--- G36/test_2.c	2022-10-07 20:26:10.000000000 +0530
++++ xv6-public_original/test_2.c	1970-01-01 05:30:00.000000000 +0530
+@@ -1,65 +0,0 @@
+-#include "types.h"
+-#include "stat.h"
+-#include "user.h"
+-
+-#include "processInfo.h"
+-int main()
+-{	
+-	// array containing burst times
+-	int t[10] = {10, 20, 30, 40, 50, 60, 70, 80, 90, 100};
+-	long x = 0;
+-	// setBurstTime(1);
+-	
+-	for(int i=0; i<10; i++)
+-	{
+-		
+-		if(fork() == 0)
+-		{
+-			x = setBurstTime(t[i]);
+-			
+-			
+-			if(x < 0)
+-			{
+-				printf(1, "Couldn't set burst time for process %d\n", getpid());
+-			}
+-			
+-			// CPU bound process
+-			if(i%2 == 0)
+-			{
+-				double y = 0;
+-				
+-				// code to add delay
+-				for(int i2=0; i2<t[i]*1000000/2; i2++)
+-				{
+-					y += 2.69*13.01;
+-				}
+-				x = y;
+-				
+-				printf(1, "CPU Bound(%d) / ",  x);
+-			}
+-			
+-			// IO bound process
+-			else
+-			{
+-				// mimicking IO wait
+-				for(int i2=0; i2<t[i]*10; i2++)
+-				{
+-					sleep(1);
+-				}
+-				printf(1, "IO Bound / ");
+-			}
+-			
+-			x = getBurstTime();
+-			struct processInfo *info;
+-			info = (struct processInfo*) malloc(sizeof(struct processInfo));
+-			getProcInfo(getpid(), info);
+-			printf(1, "PID: %d Burst Time: %d Context Switches: %d\n",getpid(), x, info->numberContextSwitches);
+-			exit();
+-						
+-		}
+-		
+-	}
+-	
+-	while(wait() != -1);
+-	exit();
+-}
+\ No newline at end of file
+diff -ruN G36/test_3.c xv6-public_original/test_3.c
+--- G36/test_3.c	2022-10-07 20:53:36.000000000 +0530
++++ xv6-public_original/test_3.c	1970-01-01 05:30:00.000000000 +0530
+@@ -1,65 +0,0 @@
+-#include "types.h"
+-#include "stat.h"
+-#include "user.h"
+-
+-#include "processInfo.h"
+-int main()
+-{	
+-	// array containing burst times
+-	int t[10] = {100, 90, 80, 70, 60, 50, 40, 30, 20, 10};
+-	long x = 0;
+-	// setBurstTime(1);
+-	
+-	for(int i=0; i<10; i++)
+-	{
+-		
+-		if(fork() == 0)
+-		{
+-			x = setBurstTime(t[i]);
+-			
+-			
+-			if(x < 0)
+-			{
+-				printf(1, "Couldn't set burst time for process %d\n", getpid());
+-			}
+-			
+-			// CPU bound process
+-			if(i%2 == 0)
+-			{
+-				double y = 0;
+-				
+-				// code to add delay
+-				for(int i2=0; i2<t[i]*1000000/2; i2++)
+-				{
+-					y += 2.69*13.01;
+-				}
+-				x = y;
+-				
+-				printf(1, "CPU Bound(%d) / ",  y);
+-			}
+-			
+-			// IO bound process
+-			else
+-			{
+-				// mimicking IO wait
+-				for(int i2=0; i2<t[i]*10; i2++)
+-				{
+-					sleep(1);
+-				}
+-				printf(1, "IO Bound / ");
+-			}
+-			
+-			x = getBurstTime();
+-			struct processInfo *info;
+-			info = (struct processInfo*) malloc(sizeof(struct processInfo));
+-			getProcInfo(getpid(), info);
+-			printf(1, "PID: %d Burst Time: %d Context Switches: %d\n",getpid(), x, info->numberContextSwitches);
+-			exit();
+-						
+-		}
+-		
+-	}
+-	
+-	while(wait() != -1);
+-	exit();
+-}
+\ No newline at end of file
+diff -ruN G36/test_buff.c xv6-public_original/test_buff.c
+--- G36/test_buff.c	2022-10-07 20:25:43.000000000 +0530
++++ xv6-public_original/test_buff.c	1970-01-01 05:30:00.000000000 +0530
+@@ -1,148 +0,0 @@
+-#include "types.h"
+-#include "stat.h"
+-#include "user.h"
+-#include "processInfo.h"
+-
+-
+-void delay(int count)
+-{
+-    int* data = (int*) malloc(sizeof(int) * 10240);
+-    if(data <= 0)
+-        printf(1, "Memory not allocated due to some error\n");
+-
+-    for(int i = 0; i < count; i++){
+-        for(int k = 0; k < 570; k++)
+-            for(int j = 0; j < 10240; j++)
+-                data[j]++;
+-    }
+-}
+-void io_delay(int cnt)
+-{
+-	cnt += cnt+100;
+-	int x = 0, y = 100,z = 0,k = 0;
+-	
+-	int* data = (int*)malloc(sizeof(int) * 10240);
+-	for(int i = 0;i <= 10000*cnt*cnt; ++i){
+-		x += y*10;
+-		x /= 10;
+-		z++;
+-		int t = k%10240;
+-		data[t]++;
+-		k++;
+-		k %= 31000;
+-	}
+-	return;
+-}
+-int main(int argc, char *argv[])
+-{
+-    if(argc < 2){
+-        printf(2, "usage: %s n\n", argv[0]);
+-        exit();
+-    }
+-    
+-    printf(1, " ~~~~~~~~~~~~First Testcase:~~~~~~~~~~~~ \n\n");
+-    
+-    int N = atoi(argv[1]);
+-
+-    int pids[N];            // contains the order in which child completes 
+-    int rets[N];            // contains the order in which child terminates and returned to parent
+-    int burst_t[N];
+-    int context_switches[N];
+-    struct processInfo p_info;
+-    
+-    for(int i = 0; i < N; i++)
+-    {
+-        int burst_time = (20-i) ;
+-        
+-        burst_t[i] = burst_time;
+-        int id = fork();
+-        // fork() returns 0 when OS runs the child process 
+-        if(id == 0){
+-            setBurstTime(burst_time);         // setting the burst time of newly created child process
+-            delay(burst_time);                          // to waste CPU time so that child doesn't terminate 
+-            exit();                             // terminating child process
+-        }
+-        else if(id > 0){
+-            // Returned to parent. pids[i] contains process ID of the child process just completed and returned back to parent.
+-            pids[i] = id;
+-        }
+-        else {
+-            // creation of a child process was unsuccessful
+-            exit();
+-        }
+-    }
+-	
+-    for(int i = 0; i < N; i++){
+-        // wait() returns process ID of the terminated child process. 
+-        rets[i] = wait();
+-        getProcInfo(pids[i], &p_info);
+-        context_switches[i] = p_info.numberContextSwitches;
+-    }
+-
+-    printf(1, "\nOrder in which children completed\n");
+-    for(int i = 0; i < N; i++){
+-        printf(2, "pid = %d 	burst time = %d  ContextSwitches =  %d\n", pids[i], burst_t[i],context_switches[i]);
+-    }  
+-
+-    printf(1, "\nOrder in which children terminates and returns back to parent\n");
+-    for(int i = 0; i < N; i++){
+-        printf(2, "pid = %d 	burst time = %d 	\n", rets[i], burst_t[rets[i]-pids[0]]);
+-    }
+-	
+-	
+-	printf(1, "\n\n\n ~~~~~~~~~~~~2nd Testcase: ~~~~~~~~~~~~ \n\n\n");
+-	
+-	
+-	for(int i = 0; i < N; i++)
+-    {
+-        int burst_time = (20-i);
+-        burst_t[i] = burst_time;
+-        int id = fork();
+-
+-        // fork() returns 0 when OS runs the child process 
+-        if(id == 0){
+-            if(i % 2 == 0){ //heavy cpu processes
+-		        setBurstTime(burst_time);         // setting the burst time of newly created child process
+-		        delay(burst_time);                  // to waste CPU time so that child doesn't terminate 
+-			}
+-			else {
+-				setBurstTime(burst_time);
+-				io_delay(burst_time);
+-				sleep(1);
+-				// yield();
+-			}
+-			exit();     // terminating child process
+-        }
+-        else if(id > 0){
+-            // Returned to parent. pids[i] contains process ID of the child process just completed and returned back to parent.
+-            pids[i] = id;
+-        }
+-        else {
+-            // creation of a child process was unsuccessful
+-            exit();
+-        }
+-    }
+-
+-    for(int i = 0; i < N; i++){
+-        // wait() returns process ID of the terminated child process. 
+-        rets[i] = wait();
+-        getProcInfo(pids[i], &p_info);
+-        context_switches[i] = p_info.numberContextSwitches;
+-    }
+-	
+-	printf(1, "\nOrder in which children completed\n");
+-	for(int i = 0; i < N; i++){ 
+-		printf(2, "pid = %d  burst time = %d  ContextSwitches =  %d\n", pids[i], burst_t[i],context_switches[i]);
+-    }  
+-    for(int itr = 0;itr < 2; ++itr){
+-    	if(itr == 0) printf(1, "\n ****Heavy CPU Bound Processes**** \n\n");
+-    	else printf(1, "\n ****IO Bound Processes****\n\n");
+-    	
+-    	printf(1, "\nOrder in which children terminates and returns back to parent\n");
+-    	for(int i = 0; i < N; i++){
+-    		if((rets[i]-pids[0])%2 == itr)		
+-        	   printf(2, "pid = %d 	   burst time = %d 	   \n", rets[i], burst_t[rets[i]-pids[0]]);
+-        }
+-    }
+-    exit();
+-}
+\ No newline at end of file
+diff -ruN G36/trap.c xv6-public_original/trap.c
+--- G36/trap.c	2022-10-07 23:29:25.964477859 +0530
++++ xv6-public_original/trap.c	2022-08-12 23:04:14.370780968 +0530
+@@ -100,21 +100,11 @@
+   if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER)
+     exit();
+ 
+-
+-  //  //  // UNCOMMENT THIS FOR SHORTEST JOB FIRST + ROUND ROBIN SCHEDULING //  //  //
+-
+-  // COMMENT IT FOR SHORTEST JOB FIRST
+-
+-  // // Force process to give up CPU on clock tick.
+-  // // If interrupts were on while locks held, would need to check nlock.
+-  // if(myproc() && myproc()->state == RUNNING &&
+-  //    tf->trapno == T_IRQ0+IRQ_TIMER)
+-  //   {
+-  //     struct proc* p = myproc();
+-  //     p->time_elapsed = p->time_elapsed + 1;
+-  //     if(p->time_quanta == 0 || p->time_elapsed % p->time_quanta == 0)
+-  //       yield();
+-  //   }
++  // Force process to give up CPU on clock tick.
++  // If interrupts were on while locks held, would need to check nlock.
++  if(myproc() && myproc()->state == RUNNING &&
++     tf->trapno == T_IRQ0+IRQ_TIMER)
++    yield();
+ 
+   // Check if the process has been killed since we yielded
+   if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER)
+diff -ruN G36/user.h xv6-public_original/user.h
+--- G36/user.h	2022-10-04 19:06:12.000000000 +0530
++++ xv6-public_original/user.h	2022-08-12 23:04:14.370780968 +0530
+@@ -1,6 +1,5 @@
+ struct stat;
+ struct rtcdate;
+-struct processInfo;
+ 
+ // system calls
+ int fork(void);
+@@ -24,11 +23,6 @@
+ char* sbrk(int);
+ int sleep(int);
+ int uptime(void);
+-int getNumProc(void);
+-int getMaxPid(void);
+-int getProcInfo(int pid, struct processInfo*);
+-int setBurstTime(int n);
+-int getBurstTime(void);
+ 
+ // ulib.c
+ int stat(const char*, struct stat*);
+diff -ruN G36/usertests.c xv6-public_original/usertests.c
+--- G36/usertests.c	2022-09-26 10:20:52.000000000 +0530
++++ xv6-public_original/usertests.c	2022-08-12 23:04:14.370780968 +0530
+@@ -1415,8 +1415,7 @@
+ sbrktest(void)
+ {
+   int fds[2], pid, pids[10], ppid;
+-  char *a, *b, *c, *oldbrk, *p, scratch;
+-  //char* lastaddr;
++  char *a, *b, *c, *lastaddr, *oldbrk, *p, scratch;
+   uint amt;
+ 
+   printf(stdout, "sbrk test\n");
+@@ -1458,8 +1457,8 @@
+     printf(stdout, "sbrk test failed to grow big address space; enough phys mem?\n");
+     exit();
+   }
+-  //lastaddr = (char*) (BIG-1);
+-  //*lastaddr = 99;
++  lastaddr = (char*) (BIG-1);
++  *lastaddr = 99;
+ 
+   // can one de-allocate?
+   a = sbrk(0);
+@@ -1481,11 +1480,11 @@
+     printf(stdout, "sbrk re-allocation failed, a %x c %x\n", a, c);
+     exit();
+   }
+-  //if(*lastaddr == 99){
+-    //// should be zero
+-    //printf(stdout, "sbrk de-allocation didn't really deallocate\n");
+-    //exit();
+-  //}
++  if(*lastaddr == 99){
++    // should be zero
++    printf(stdout, "sbrk de-allocation didn't really deallocate\n");
++    exit();
++  }
+ 
+   a = sbrk(0);
+   c = sbrk(-(sbrk(0) - oldbrk));
+diff -ruN G36/usys.S xv6-public_original/usys.S
+--- G36/usys.S	2022-10-04 19:05:07.000000000 +0530
++++ xv6-public_original/usys.S	2022-08-12 23:04:14.370780968 +0530
+@@ -29,8 +29,3 @@
+ SYSCALL(sbrk)
+ SYSCALL(sleep)
+ SYSCALL(uptime)
+-SYSCALL(getNumProc)
+-SYSCALL(getMaxPid)
+-SYSCALL(getProcInfo)
+-SYSCALL(setBurstTime)
+-SYSCALL(getBurstTime)
+\ No newline at end of file
